@@ -142,7 +142,7 @@ namespace LoRaTools.Regions
                 } else {
                     //error handling
                 }
-                return drConf.configuration;
+                return null;
                 // return this.DRtoConfiguration[10-dr].configuration;
             }
 
