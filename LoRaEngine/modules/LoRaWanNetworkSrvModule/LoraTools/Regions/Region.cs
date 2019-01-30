@@ -134,8 +134,16 @@ namespace LoRaTools.Regions
             {
                 var dr = this.DRtoConfiguration.FirstOrDefault(x => x.Value.configuration == upstreamChannel.datr).Key;
                 //TODO take care of rx1droffset
-                var DRConf = this.DRtoConfiguration[10 - dr];
-                return DRConf.configuration;
+                Tuple<string, uint> drConf = new Tuple<string,uint>();
+                if(dr < 4){
+                    drConf = this.DRtoConfiguration[10 + dr];
+                }
+                else if(dr == 4){
+                    var drConf = this.DRtoConfiguration[13];
+                } else {
+                    //error handling
+                }
+                return drConf.configuration;
                 // return this.DRtoConfiguration[10-dr].configuration;
             }
 
