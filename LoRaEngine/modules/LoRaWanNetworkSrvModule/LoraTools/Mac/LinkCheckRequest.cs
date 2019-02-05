@@ -6,31 +6,22 @@ namespace LoRaTools
     using System;
 
     /// <summary>
-    /// LinkCheckReq Upstream & LinkCheckAns Downstream
+    /// LinkCheckReq Upstream
     /// </summary>
-    public class LinkCheckCmd : GenericMACCommand
+    public class LinkCheckRequest : MacCommand
     {
         uint Margin { get; set; }
 
         uint GwCnt { get; set; }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="LinkCheckCmd"/> class.
-        /// Upstream Constructor
-        /// </summary>
-        public LinkCheckCmd()
-        {
-            this.Length = 1;
-            this.Cid = CidEnum.LinkCheckCmd;
-        }
+        public override int Length => 3;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="LinkCheckCmd"/> class.
+        /// Initializes a new instance of the <see cref="LinkCheckRequest"/> class.
         /// Downstream Constructor
         /// </summary>
-        public LinkCheckCmd(uint margin, uint gwCnt)
+        public LinkCheckRequest(uint margin, uint gwCnt)
         {
-            this.Length = 3;
             this.Cid = CidEnum.LinkCheckCmd;
             this.Margin = margin;
             this.GwCnt = gwCnt;

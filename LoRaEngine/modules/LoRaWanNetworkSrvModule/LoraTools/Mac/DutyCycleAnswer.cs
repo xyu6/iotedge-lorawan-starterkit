@@ -5,23 +5,23 @@ namespace LoRaTools
 {
     using System;
 
-    public class NewChannelAns : NewChannelCmd
+    /// <summary>
+    /// DutyCycleAns Upstream
+    /// </summary>
+    public class DutyCycleAnswer : MacCommand
     {
-        private readonly bool drRangOk;
+        public override int Length => 1;
 
-        private readonly bool chanFreqOk;
-
-        public NewChannelAns(bool drRangeOk, bool chanFreqOk)
+        public DutyCycleAnswer()
         {
-            this.Length = 2;
-            this.drRangOk = drRangeOk;
-            this.chanFreqOk = chanFreqOk;
-            this.Cid = CidEnum.NewChannelCmd;
+            this.Cid = CidEnum.DutyCycleCmd;
         }
 
         public override byte[] ToBytes()
         {
-            throw new NotImplementedException();
+            byte[] returnedBytes = new byte[this.Length];
+            returnedBytes[0] = (byte)this.Cid;
+            return returnedBytes;
         }
 
         public override string ToString()

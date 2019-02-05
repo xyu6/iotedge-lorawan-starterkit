@@ -55,7 +55,7 @@ void setup(void)
   lora.setJoinDutyCycle(false);
 
 
-  lora.setPower(14);
+  lora.setPower(1);
 
 
 }

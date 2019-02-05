@@ -35,6 +35,11 @@ namespace LoRaTools.LoRaMessage
     public class LoRaPayloadData : LoRaPayload
     {
         /// <summary>
+        /// List of Mac Commands in the LoRaPayload
+        /// </summary>
+        private List<MacCommand> macCommands;
+
+        /// <summary>
         /// Gets the LoRa payload fport as value
         /// </summary>
         public byte GetFPort()
@@ -101,12 +106,6 @@ namespace LoRaTools.LoRaMessage
         /// </summary>
         public int Direction { get; set; }
 
-        public MacCommandHolder GetMacCommands()
-        {
-            MacCommandHolder macHolder = new MacCommandHolder(this.Fopts.ToArray());
-            return macHolder;
-        }
-
         /// <summary>
         /// Initializes a new instance of the <see cref="LoRaPayloadData"/> class.
         /// Constructor used by the simulator
@@ -152,6 +151,17 @@ namespace LoRaTools.LoRaMessage
             this.Fport = new Memory<byte>(inputMessage, 8 + foptsSize, fportLength);
             // frmpayload
             this.Frmpayload = new Memory<byte>(inputMessage, 8 + fportLength + foptsSize, inputMessage.Length - 8 - fportLength - 4 - foptsSize);
+
+            // Populate the MacCommands present in the payload.
+            if (foptsSize > 0)
+            {
+                this.macCommands = MacCommand.CreateMacCommandFromBytes(this.Fopts);
+            }
+            else if (this.Fport.Span[0] == (byte)0)
+            {
+                this.macCommands = MacCommand.CreateMacCommandFromBytes(this.Frmpayload);
+            }
+
             this.Mic = new Memory<byte>(inputMessage, inputMessage.Length - 4, 4);
         }
 
@@ -159,8 +169,9 @@ namespace LoRaTools.LoRaMessage
         /// Initializes a new instance of the <see cref="LoRaPayloadData"/> class.
         /// Downstream Constructor (build a LoRa Message)
         /// </summary>
-        public LoRaPayloadData(LoRaMessageType mhdr, byte[] devAddr, byte[] fctrl, byte[] fcnt, byte[] fOpts, byte[] fPort, byte[] frmPayload, int direction)
+        public LoRaPayloadData(LoRaMessageType mhdr, byte[] devAddr, byte[] fctrl, byte[] fcnt, MacCommand macCommand, byte[] fPort, byte[] frmPayload, int direction)
         {
+            var fOpts = macCommand?.ToBytes() ?? null;
             int fOptsLen = fOpts == null ? 0 : fOpts.Length;
             int frmPayloadLen = frmPayload == null ? 0 : frmPayload.Length;
             int fPortLen = fPort == null ? 0 : fPort.Length;
@@ -417,6 +428,25 @@ namespace LoRaTools.LoRaMessage
             }
 
             return messageArray.ToArray();
+        }
+
+        /// <summary>
+        /// Get Mac Commands carried in the Payload
+        /// </summary>
+        public List<MacCommand> GetMacCommands() => this.macCommands;
+
+        /// <summary>
+        /// Add Mac Command to a LoRa Payload
+        /// Warning, do not use this method if your LoRaPayload was created from bytes
+        /// </summary>
+        public void AddMacCommand(MacCommand mac)
+        {
+            if (this.macCommands == null)
+            {
+                this.macCommands = new List<MacCommand>();
+            }
+
+            this.macCommands.Add(mac);
         }
     }
 }

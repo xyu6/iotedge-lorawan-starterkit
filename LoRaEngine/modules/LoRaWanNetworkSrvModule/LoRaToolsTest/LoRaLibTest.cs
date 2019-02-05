@@ -347,14 +347,13 @@ namespace LoRaWanTest
             Array.Reverse(devAddr);
             byte[] fCtrl = new byte[] { 0x80 };
             var fcntBytes = BitConverter.GetBytes(fcnt);
-            byte[] fopts = new byte[0];
             byte[] fPort = new byte[] { 1 };
             byte[] payload = Encoding.UTF8.GetBytes(data);
             Array.Reverse(payload);
 
             // 0 = uplink, 1 = downlink
             int direction = 0;
-            var devicePayloadData = new LoRaPayloadData(loRaMessageType, devAddr, fCtrl, fcntBytes, fopts, fPort, payload, direction);
+            var devicePayloadData = new LoRaPayloadData(loRaMessageType, devAddr, fCtrl, fcntBytes, null, fPort, payload, direction);
 
             Assert.Equal(12, devicePayloadData.GetFcnt());
             Assert.Equal(0, devicePayloadData.Direction);

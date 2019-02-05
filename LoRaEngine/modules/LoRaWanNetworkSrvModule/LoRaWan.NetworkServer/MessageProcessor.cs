@@ -407,7 +407,7 @@ namespace LoRaWan.NetworkServer
 
             byte? fport = null;
             var requiresDeviceAcknowlegement = false;
-            byte[] macbytes = null;
+            MacCommand macCommand = null;
 
             byte[] rndToken = new byte[2];
             Random rnd = new Random();
@@ -420,8 +420,14 @@ namespace LoRaWan.NetworkServer
                 if (cloudToDeviceMessage.Properties.TryGetValueCaseInsensitive("cidtype", out var cidTypeValue))
                 {
                     Logger.Log(loRaDevice.DevEUI, "Cloud to device MAC command received", LogLevel.Information);
-                    MacCommandHolder macCommandHolder = new MacCommandHolder(Convert.ToByte(cidTypeValue));
-                    macbytes = macCommandHolder.MacCommand[0].ToBytes();
+                    try
+                    {
+                        macCommand = MacCommand.CreateMacCommandFromC2DMessage(cidTypeValue, cloudToDeviceMessage.Properties);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log(loRaDevice.DevEUI, ex.ToString(), LogLevel.Error);
+                    }
                 }
 
                 if (cloudToDeviceMessage.Properties.TryGetValueCaseInsensitive("confirmed", out var confirmedValue) && confirmedValue.Equals("true", StringComparison.OrdinalIgnoreCase))
@@ -468,7 +474,7 @@ namespace LoRaWan.NetworkServer
                 reversedDevAddr,
                 new byte[] { fctrl },
                 BitConverter.GetBytes(fcntDown),
-                macbytes,
+                macCommand,
                 fport.HasValue ? new byte[] { fport.Value } : null,
                 frmPayload,
                 1);
@@ -555,16 +561,16 @@ namespace LoRaWan.NetworkServer
             }
 
             var macCommand = loRaPayloadData.GetMacCommands();
-            if (macCommand.MacCommand.Count > 0)
+            if (macCommand?.Count > 0)
             {
                 eventProperties = eventProperties ?? new Dictionary<string, string>();
 
-                for (int i = 0; i < macCommand.MacCommand.Count; i++)
+                for (int i = 0; i < macCommand.Count; i++)
                 {
-                    eventProperties[macCommand.MacCommand[i].Cid.ToString()] = JsonConvert.SerializeObject(macCommand.MacCommand[i], Formatting.None);
+                    eventProperties[macCommand[i].Cid.ToString()] = JsonConvert.SerializeObject(macCommand[i], Formatting.None);
 
                     // in case it is a link check mac, we need to send it downstream.
-                    if (macCommand.MacCommand[i].Cid == CidEnum.LinkCheckCmd)
+                    if (macCommand[i].Cid == CidEnum.LinkCheckCmd)
                     {
                         // linkCheckCmdResponse = new LinkCheckCmd(rxPk.GetModulationMargin(), 1).ToBytes();
                     }
