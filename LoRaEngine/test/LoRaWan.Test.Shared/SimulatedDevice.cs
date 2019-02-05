@@ -104,7 +104,6 @@ namespace LoRaWan.Test.Shared
 
             var fcntBytes = BitConverter.GetBytes((ushort)fcnt.Value);
 
-            byte[] fopts = new byte[0];
             byte[] fPort = new byte[] { fport };
             // TestLogger.Log($"{LoRaDevice.DeviceID}: Simulated data: {data}");
             byte[] payload = null;
@@ -117,7 +116,7 @@ namespace LoRaWan.Test.Shared
             // 0 = uplink, 1 = downlink
             int direction = 0;
 
-            var payloadData = new LoRaPayloadData(LoRaMessageType.UnconfirmedDataUp, devAddr, fCtrl, fcntBytes, fopts, fPort, payload, direction);
+            var payloadData = new LoRaPayloadData(LoRaMessageType.UnconfirmedDataUp, devAddr, fCtrl, fcntBytes, null, fPort, payload, direction);
             return payloadData;
         }
 
@@ -137,14 +136,13 @@ namespace LoRaWan.Test.Shared
 
             var fcntBytes = BitConverter.GetBytes((ushort)fcnt.Value);
 
-            byte[] fopts = new byte[0];
             byte[] fPort = new byte[] { fport };
             byte[] payload = Encoding.UTF8.GetBytes(data);
             Array.Reverse(payload);
 
             // 0 = uplink, 1 = downlink
             int direction = 0;
-            var payloadData = new LoRaPayloadData(LoRaMessageType.ConfirmedDataUp, devAddr, fCtrl, fcntBytes, fopts, fPort, payload, direction);
+            var payloadData = new LoRaPayloadData(LoRaMessageType.ConfirmedDataUp, devAddr, fCtrl, fcntBytes, null, fPort, payload, direction);
 
             return payloadData;
         }
