@@ -42,7 +42,7 @@ void setup(void)
 
   lora.setDeciveMode(LWABP);
   lora.setDataRate(dr, physicalType);
-
+  lora.setPort(1);
   lora.setChannel(0, 868.1);
   lora.setChannel(1, 868.3);
   lora.setChannel(2, 868.5);
@@ -55,14 +55,14 @@ void setup(void)
   lora.setJoinDutyCycle(false);
 
 
-  lora.setPower(14);
+  lora.setPower(1);
 
 
 }
 
 void loop(void)
 {
-  if ((millis() - lastCall) > 5000) {
+  if ((millis() - lastCall) > 20000) {
     lastCall = millis();
     bool result = false;
     String packetString = "";
