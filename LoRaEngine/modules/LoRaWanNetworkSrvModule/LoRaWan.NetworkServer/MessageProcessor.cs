@@ -15,6 +15,7 @@ namespace LoRaWan.NetworkServer
     using Microsoft.Azure.Devices.Client;
     using Microsoft.Extensions.Logging;
     using Newtonsoft.Json;
+    using Newtonsoft.Json.Linq;
 
     /// <summary>
     /// Message processor
@@ -210,6 +211,9 @@ namespace LoRaWan.NetworkServer
                         Logger.Log(loRaDevice.DevEUI, $"down frame counter: {loRaDevice.FCntDown}", LogLevel.Information);
                     }
 
+                    // Contains the Cloud to message we need to send
+                    Message cloudToDeviceMessage = null;
+
                     if (!isConfirmedResubmit)
                     {
                         var validFcntUp = isFrameCounterFromNewlyStartedDevice || (payloadFcnt > loRaDevice.FCntUp);
@@ -246,6 +250,23 @@ namespace LoRaWan.NetworkServer
                                     Logger.Log(loRaDevice.DevEUI, $"decoding with: {loRaDevice.SensorDecoder} port: {fportUp}", LogLevel.Debug);
                                     payloadData = await this.payloadDecoder.DecodeMessageAsync(decryptedPayloadData, fportUp, loRaDevice.SensorDecoder);
                                 }
+
+                                // Check for Decoder 2 Device message
+                                if (((JObject)payloadData).ContainsKey("device_message"))
+                                {
+                                    // Add D2D message
+                                    JObject deviceMessage = (JObject)((JObject)payloadData)["device_message"];
+
+                                    // TODO: Add d2d logic
+                                    cloudToDeviceMessage = new Message()
+                                }
+
+                                // Extract decoded payload data in case payload and d2d message are present
+                                if (((JObject)payloadData).ContainsKey("decoded_message"))
+                                {
+                                    payloadData = (JObject)((JObject)payloadData)["decoded_message"];
+                                }
+
                             }
 
                             if (!await this.SendDeviceEventAsync(loRaDevice, rxpk, payloadData, loraPayload, timeWatcher))
@@ -295,7 +316,7 @@ namespace LoRaWan.NetworkServer
                     var fpending = false;
 
                     // Contains the Cloud to message we need to send
-                    Message cloudToDeviceMessage = null;
+                    // Message cloudToDeviceMessage = null;
 
                     if (loRaDevice.DownlinkEnabled)
                     {

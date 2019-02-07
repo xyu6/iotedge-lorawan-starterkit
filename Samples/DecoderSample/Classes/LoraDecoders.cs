@@ -3,6 +3,7 @@
 
 namespace SensorDecoderModule.Classes
 {
+    using System.Collections.Generic;
     using System.Text;
     using Newtonsoft.Json;
 
@@ -19,7 +20,35 @@ namespace SensorDecoderModule.Classes
             // Write code that decodes the payload here.
 
             // Return a JSON string containing the decoded data
-            return JsonConvert.SerializeObject(new { value = result });
+            return JsonConvert.SerializeObject(new ValueSensorResponse { value = result });
         }
+
+        private static string DecoderValueSensorWithDeviceMessage(byte[] payload, uint fport)
+        {
+            // Decode payload
+            var decodedMessage = new ValueSensorResponse
+            {
+                value = Encoding.UTF8.GetString(payload)
+            };
+
+            // Create Decoder 2 Device message
+            var deviceMessage = new DeviceMessage
+            {
+                devEUI = null,
+                fport = fport,
+                confirmed = false,
+                data = ConversionHelper.Base64Encode("message to device"),
+                data_string = "message to device",
+            };
+            deviceMessage.macCommands.Add(new MacCommand { cid = 1 });
+
+            // Return a JSON string containing the decoded data
+            return ResponseHelper.BuildResponse(decodedMessage, deviceMessage);
+        }
+    }
+
+    public class ValueSensorResponse
+    {
+        public string value { get; set; }
     }
 }
