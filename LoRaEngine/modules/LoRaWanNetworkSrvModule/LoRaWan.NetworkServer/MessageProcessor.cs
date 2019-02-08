@@ -254,8 +254,8 @@ namespace LoRaWan.NetworkServer
                                     if (((JObject)payloadData).ContainsKey("device_message"))
                                     {
                                         // Add D2D message
-                                        JObject deviceMessage = (JObject)((JObject)payloadData)["device_message"];
-                                        cloudToDeviceMessage.GetMessageFromString((string)deviceMessage["device_message"]["message_string"]);
+                                        string deviceMessage = (string)((JObject)payloadData)["device_message"]["data_string"];
+                                        cloudToDeviceMessage.GetMessageFromString(deviceMessage);
                                         cloudToDeviceMessage.DecoderUrl = loRaDevice.SensorDecoder;
                                     }
 
