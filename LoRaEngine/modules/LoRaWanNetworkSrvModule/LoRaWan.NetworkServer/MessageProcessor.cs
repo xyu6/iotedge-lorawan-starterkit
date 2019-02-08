@@ -212,7 +212,7 @@ namespace LoRaWan.NetworkServer
                     }
 
                     // Contains the Cloud to message we need to send
-                    Message cloudToDeviceMessage = null;
+                    LoRaMessage cloudToDeviceMessage = new LoRaMessage();
 
                     if (!isConfirmedResubmit)
                     {
@@ -249,24 +249,22 @@ namespace LoRaWan.NetworkServer
                                 {
                                     Logger.Log(loRaDevice.DevEUI, $"decoding with: {loRaDevice.SensorDecoder} port: {fportUp}", LogLevel.Debug);
                                     payloadData = await this.payloadDecoder.DecodeMessageAsync(decryptedPayloadData, fportUp, loRaDevice.SensorDecoder);
+
+                                    // Check for Decoder 2 Device message
+                                    if (((JObject)payloadData).ContainsKey("device_message"))
+                                    {
+                                        // Add D2D message
+                                        JObject deviceMessage = (JObject)((JObject)payloadData)["device_message"];
+                                        cloudToDeviceMessage.GetMessageFromString((string)deviceMessage["device_message"]["message_string"]);
+                                        cloudToDeviceMessage.DecoderUrl = loRaDevice.SensorDecoder;
+                                    }
+
+                                    // Extract decoded payload data in case payload and d2d message are present
+                                    if (((JObject)payloadData).ContainsKey("decoded_message"))
+                                    {
+                                        payloadData = (JObject)((JObject)payloadData)["decoded_message"];
+                                    }
                                 }
-
-                                // Check for Decoder 2 Device message
-                                if (((JObject)payloadData).ContainsKey("device_message"))
-                                {
-                                    // Add D2D message
-                                    JObject deviceMessage = (JObject)((JObject)payloadData)["device_message"];
-
-                                    // TODO: Add d2d logic
-                                    cloudToDeviceMessage = new Message()
-                                }
-
-                                // Extract decoded payload data in case payload and d2d message are present
-                                if (((JObject)payloadData).ContainsKey("decoded_message"))
-                                {
-                                    payloadData = (JObject)((JObject)payloadData)["decoded_message"];
-                                }
-
                             }
 
                             if (!await this.SendDeviceEventAsync(loRaDevice, rxpk, payloadData, loraPayload, timeWatcher))
@@ -315,61 +313,69 @@ namespace LoRaWan.NetworkServer
                     // Flag indicating if there is another C2D message waiting
                     var fpending = false;
 
-                    // Contains the Cloud to message we need to send
-                    // Message cloudToDeviceMessage = null;
-
                     if (loRaDevice.DownlinkEnabled)
                     {
+                        var timeAvailableToCheckCloudToDeviceMessages = timeWatcher.GetAvailableTimeToCheckCloudToDeviceMessage(loRaDevice);
+
+                        // C2D message received from Decoder
+                        if (cloudToDeviceMessage.Message != null && !this.ValidateCloudToDeviceMessage(loRaDevice, cloudToDeviceMessage.Message))
+                        {
+                            _ = cloudToDeviceMessage.CompleteAsync(loRaDevice);
+                            cloudToDeviceMessage.Message = null;
+                        }
+
                         // ReceiveAsync has a longer timeout
                         // But we wait less that the timeout (available time before 2nd window)
-                        // if message is received after timeout, keep it in loraDeviceInfo and return the next call
-                        var timeAvailableToCheckCloudToDeviceMessages = timeWatcher.GetAvailableTimeToCheckCloudToDeviceMessage(loRaDevice);
-                        if (timeAvailableToCheckCloudToDeviceMessages >= LoRaOperationTimeWatcher.MinimumAvailableTimeToCheckForCloudMessage)
+                        // if message is received after timeout, keep it in loraDeviceInfo and return it the next call
+                        else if (timeAvailableToCheckCloudToDeviceMessages >= LoRaOperationTimeWatcher.MinimumAvailableTimeToCheckForCloudMessage)
                         {
-                            cloudToDeviceMessage = await loRaDevice.ReceiveCloudToDeviceAsync(timeAvailableToCheckCloudToDeviceMessages);
-                            if (cloudToDeviceMessage != null && !this.ValidateCloudToDeviceMessage(loRaDevice, cloudToDeviceMessage))
+                            cloudToDeviceMessage.Message = await loRaDevice.ReceiveCloudToDeviceAsync(timeAvailableToCheckCloudToDeviceMessages);
+                            if (cloudToDeviceMessage.Message != null && !this.ValidateCloudToDeviceMessage(loRaDevice, cloudToDeviceMessage.Message))
                             {
-                                _ = loRaDevice.CompleteCloudToDeviceMessageAsync(cloudToDeviceMessage);
-                                cloudToDeviceMessage = null;
+                                _ = cloudToDeviceMessage.CompleteAsync(loRaDevice);
+                                cloudToDeviceMessage.Message = null;
                             }
+                        }
 
-                            if (cloudToDeviceMessage != null)
+                        if (cloudToDeviceMessage.Message != null)
+                        {
+                            if (!requiresConfirmation)
                             {
-                                if (!requiresConfirmation)
+                                // The message coming from the device was not confirmed, therefore we did not compute the frame count down
+                                // Now we need to increment because there is a C2D message to be sent
+                                fcntDown = await frameCounterStrategy.NextFcntDown(loRaDevice, payloadFcnt);
+
+                                if (fcntDown == 0)
                                 {
-                                    // The message coming from the device was not confirmed, therefore we did not computed the frame count down
-                                    // Now we need to increment because there is a C2D message to be sent
-                                    fcntDown = await frameCounterStrategy.NextFcntDown(loRaDevice, payloadFcnt);
+                                    // We did not get a valid frame count down, therefore we should not process the message
+                                    _ = cloudToDeviceMessage.AbandonAsync(loRaDevice);
 
-                                    if (fcntDown == 0)
-                                    {
-                                        // We did not get a valid frame count down, therefore we should not process the message
-                                        _ = loRaDevice.AbandonCloudToDeviceMessageAsync(cloudToDeviceMessage);
-
-                                        cloudToDeviceMessage = null;
-                                    }
-                                    else
-                                    {
-                                        requiresConfirmation = true;
-                                    }
-
-                                    Logger.Log(loRaDevice.DevEUI, $"down frame counter: {loRaDevice.FCntDown}", LogLevel.Information);
+                                    cloudToDeviceMessage.Message = null;
+                                }
+                                else
+                                {
+                                    requiresConfirmation = true;
                                 }
 
-                                // Checking again if cloudToDeviceMessage is valid because the fcntDown resolution could have failed,
-                                // causing us to drop the message
-                                if (cloudToDeviceMessage != null)
+                                Logger.Log(loRaDevice.DevEUI, $"down frame counter: {loRaDevice.FCntDown}", LogLevel.Information);
+                            }
+
+                            // Checking again if cloudToDeviceMessage is valid because the fcntDown resolution could have failed,
+                            // causing us to drop the message
+                            if (cloudToDeviceMessage.Message != null)
+                            {
+                                var remainingTimeForFPendingCheck = timeWatcher.GetRemainingTimeToReceiveSecondWindow(loRaDevice) - (LoRaOperationTimeWatcher.CheckForCloudMessageCallEstimatedOverhead + LoRaOperationTimeWatcher.MinimumAvailableTimeToCheckForCloudMessage);
+                                if (remainingTimeForFPendingCheck >= LoRaOperationTimeWatcher.MinimumAvailableTimeToCheckForCloudMessage)
                                 {
-                                    var remainingTimeForFPendingCheck = timeWatcher.GetRemainingTimeToReceiveSecondWindow(loRaDevice) - (LoRaOperationTimeWatcher.CheckForCloudMessageCallEstimatedOverhead + LoRaOperationTimeWatcher.MinimumAvailableTimeToCheckForCloudMessage);
-                                    if (remainingTimeForFPendingCheck >= LoRaOperationTimeWatcher.MinimumAvailableTimeToCheckForCloudMessage)
+                                    LoRaMessage additionalMsg = new LoRaMessage
                                     {
-                                        var additionalMsg = await loRaDevice.ReceiveCloudToDeviceAsync(LoRaOperationTimeWatcher.MinimumAvailableTimeToCheckForCloudMessage);
-                                        if (additionalMsg != null)
-                                        {
-                                            fpending = true;
-                                            _ = loRaDevice.AbandonCloudToDeviceMessageAsync(additionalMsg);
-                                            Logger.Log(loRaDevice.DevEUI, $"found fpending c2d message id: {additionalMsg.MessageId ?? "undefined"}", LogLevel.Information);
-                                        }
+                                        Message = await loRaDevice.ReceiveCloudToDeviceAsync(LoRaOperationTimeWatcher.MinimumAvailableTimeToCheckForCloudMessage)
+                                    };
+                                    if (additionalMsg.Message != null)
+                                    {
+                                        fpending = true;
+                                        _ = loRaDevice.AbandonCloudToDeviceMessageAsync(additionalMsg.Message);
+                                        Logger.Log(loRaDevice.DevEUI, $"found fpending c2d message id: {additionalMsg.Message.MessageId ?? "undefined"}", LogLevel.Information);
                                     }
                                 }
                             }
@@ -383,7 +389,7 @@ namespace LoRaWan.NetworkServer
                     }
 
                     var confirmDownstream = this.CreateDownlinkMessage(
-                        cloudToDeviceMessage,
+                        cloudToDeviceMessage.Message,
                         loRaDevice,
                         rxpk,
                         loraPayload,
@@ -396,12 +402,12 @@ namespace LoRaWan.NetworkServer
                     {
                         if (confirmDownstream == null)
                         {
-                            Logger.Log(loRaDevice.DevEUI, $"out of time for downstream message, will abandon c2d message id: {cloudToDeviceMessage.MessageId ?? "undefined"}", LogLevel.Information);
-                            _ = loRaDevice.AbandonCloudToDeviceMessageAsync(cloudToDeviceMessage);
+                            Logger.Log(loRaDevice.DevEUI, $"out of time for downstream message, will abandon c2d message id: {cloudToDeviceMessage.Message.MessageId ?? "undefined"}", LogLevel.Information);
+                            _ = cloudToDeviceMessage.AbandonAsync(loRaDevice);
                         }
                         else
                         {
-                            _ = loRaDevice.CompleteCloudToDeviceMessageAsync(cloudToDeviceMessage);
+                            _ = cloudToDeviceMessage.CompleteAsync(loRaDevice);
                         }
                     }
 
