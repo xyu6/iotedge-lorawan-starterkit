@@ -253,7 +253,7 @@ namespace LoRaWan.NetworkServer
                                     // Check for Decoder 2 Device message
                                     if (((JObject)payloadData).ContainsKey("device_message"))
                                     {
-                                        // Add D2D message
+                                        // Add D2D message // NEEDS ERROR HANDLING
                                         string deviceMessage = (string)((JObject)payloadData)["device_message"]["data_string"];
                                         cloudToDeviceMessage.GetMessageFromString(deviceMessage);
                                         cloudToDeviceMessage.DecoderUrl = loRaDevice.SensorDecoder;
@@ -262,6 +262,7 @@ namespace LoRaWan.NetworkServer
                                     // Extract decoded payload data in case payload and d2d message are present
                                     if (((JObject)payloadData).ContainsKey("decoded_message"))
                                     {
+                                        // Add payload data // NEEDS ERROR HANDLING
                                         payloadData = (JObject)((JObject)payloadData)["decoded_message"];
                                     }
                                 }
