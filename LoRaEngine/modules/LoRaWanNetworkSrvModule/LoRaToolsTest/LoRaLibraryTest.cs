@@ -7,6 +7,7 @@ namespace LoRaWanTest
     using System.Collections.Generic;
     using System.Linq;
     using System.Text;
+    using LoRaTools;
     using LoRaTools.LoRaMessage;
     using LoRaTools.LoRaPhysical;
     using LoRaTools.Regions;
@@ -332,7 +333,7 @@ namespace LoRaWanTest
             Array.Reverse(devAddr);
             byte[] fCtrl = new byte[] { 0x80 };
             var fcntBytes = BitConverter.GetBytes(fcnt);
-            byte[] fopts = new byte[0];
+            List<MacCommand> fopts = new List<MacCommand>();
             byte[] fPort = new byte[] { 1 };
             byte[] payload = Encoding.UTF8.GetBytes(data);
             Array.Reverse(payload);

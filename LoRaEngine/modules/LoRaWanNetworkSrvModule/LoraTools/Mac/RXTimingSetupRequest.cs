@@ -4,30 +4,29 @@
 namespace LoRaTools
 {
     using System;
+    using System.Collections.Generic;
 
     /// <summary>
     /// RXTimingSetupAns Upstream & RXTimingSetupReq Downstream
     /// </summary>
-    public class RXTimingSetupCmd : GenericMACCommand
+    public class RXTimingSetupRequest : MacCommand
     {
-        private readonly uint delay;
+        private readonly byte settings;
 
-        public RXTimingSetupCmd(uint delay)
+        public override int Length => 2;
+
+        public RXTimingSetupRequest(byte delay)
         {
-            this.Length = 2;
             this.Cid = CidEnum.RXTimingCmd;
-            this.delay = delay;
+            this.settings |= delay;
         }
 
-        public RXTimingSetupCmd()
+        public override IEnumerable<byte> ToBytes()
         {
-            this.Length = 1;
-            this.Cid = CidEnum.RXTimingCmd;
-        }
-
-        public override byte[] ToBytes()
-        {
-            throw new NotImplementedException();
+            List<byte> returnedBytes = new List<byte>();
+            returnedBytes[0] = (byte)this.Cid;
+            returnedBytes[1] = (byte)this.settings;
+            return returnedBytes;
         }
 
         public override string ToString()

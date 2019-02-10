@@ -10,6 +10,7 @@ namespace LoRaTools.LoRaMessage
     using LoRaTools.LoRaPhysical;
     using LoRaTools.Utils;
     using LoRaWan;
+    using Microsoft.Azure.Devices.Client;
     using Microsoft.Extensions.Logging;
     using Newtonsoft.Json;
     using Org.BouncyCastle.Crypto;
@@ -34,6 +35,11 @@ namespace LoRaTools.LoRaMessage
     /// </summary>
     public class LoRaPayloadData : LoRaPayload
     {
+        /// <summary>
+        /// List of Mac Commands in the LoRaPayload
+        /// </summary>
+        private List<MacCommand> macCommands;
+
         /// <summary>
         /// Gets the LoRa payload fport as value
         /// </summary>
@@ -101,12 +107,6 @@ namespace LoRaTools.LoRaMessage
         /// </summary>
         public int Direction { get; set; }
 
-        public MacCommandHolder GetMacCommands()
-        {
-            MacCommandHolder macHolder = new MacCommandHolder(this.Fopts.ToArray());
-            return macHolder;
-        }
-
         /// <summary>
         /// Initializes a new instance of the <see cref="LoRaPayloadData"/> class.
         /// Constructor used by the simulator
@@ -152,6 +152,17 @@ namespace LoRaTools.LoRaMessage
             this.Fport = new Memory<byte>(inputMessage, 8 + foptsSize, fportLength);
             // frmpayload
             this.Frmpayload = new Memory<byte>(inputMessage, 8 + fportLength + foptsSize, inputMessage.Length - 8 - fportLength - 4 - foptsSize);
+
+            // Populate the MacCommands present in the payload.
+            if (foptsSize > 0)
+            {
+                this.macCommands = MacCommand.CreateMacCommandFromBytes(this.Fopts);
+            }
+            else if (this.Fport.Span[0] == (byte)0)
+            {
+                this.macCommands = MacCommand.CreateMacCommandFromBytes(this.Frmpayload);
+            }
+
             this.Mic = new Memory<byte>(inputMessage, inputMessage.Length - 4, 4);
         }
 
@@ -159,8 +170,18 @@ namespace LoRaTools.LoRaMessage
         /// Initializes a new instance of the <see cref="LoRaPayloadData"/> class.
         /// Downstream Constructor (build a LoRa Message)
         /// </summary>
-        public LoRaPayloadData(LoRaMessageType mhdr, byte[] devAddr, byte[] fctrl, byte[] fcnt, byte[] fOpts, byte[] fPort, byte[] frmPayload, int direction)
+        public LoRaPayloadData(LoRaMessageType mhdr, byte[] devAddr, byte[] fctrl, byte[] fcnt, ICollection<MacCommand> macCommands, byte[] fPort, byte[] frmPayload, int direction)
         {
+            IEnumerable<byte> macBytes = new List<byte>();
+            if (macCommands != null)
+            {
+                foreach (var macCommand in macCommands)
+                {
+                    macBytes.Concat(macCommand.ToBytes());
+                }
+            }
+
+            var fOpts = macBytes.ToArray();
             int fOptsLen = fOpts == null ? 0 : fOpts.Length;
             int frmPayloadLen = frmPayload == null ? 0 : frmPayload.Length;
             int fPortLen = fPort == null ? 0 : fPort.Length;
@@ -417,6 +438,80 @@ namespace LoRaTools.LoRaMessage
             }
 
             return messageArray.ToArray();
+        }
+
+        /// <summary>
+        /// Add Mac Command to a LoRa Payload
+        /// Warning, do not use this method if your LoRaPayload was created from bytes
+        /// </summary>
+        public void AddMacCommand(MacCommand mac)
+        {
+            if (this.macCommands == null)
+            {
+                this.macCommands = new List<MacCommand>();
+            }
+
+            this.macCommands.Add(mac);
+        }
+
+        /// <summary>
+        /// Send detected MAC commands as message properties.
+        /// </summary>
+        public void ProcessAndSendMacCommands(ref Dictionary<string, string> eventProperties)
+        {
+           if (this.macCommands?.Count > 0)
+            {
+                eventProperties = eventProperties ?? new Dictionary<string, string>();
+
+                for (int i = 0; i < this.macCommands.Count; i++)
+                {
+                    eventProperties[this.macCommands[i].Cid.ToString()] = JsonConvert.SerializeObject(this.macCommands[i].ToString(), Formatting.None);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Does a Mac command require an answer?
+        /// </summary>
+        public bool IsMacAnswerRequired()
+        {
+            return this.macCommands.Where(x => x.Cid == CidEnum.LinkCheckCmd).Count() > 0 ? true : false;
+        }
+
+        /// <summary>
+        /// Prepare the Mac Commands to be sent in the downstream message.
+        /// </summary>
+        public ICollection<MacCommand> PrepareMacCommandAnswer(string devEUI, Message cloudToDeviceMessage, Rxpk rxpk)
+        {
+            Dictionary<int, MacCommand> macCommands = new Dictionary<int, MacCommand>();
+
+            // Check if the device sent a Mac Command requiring a response.
+            if (this.IsMacAnswerRequired())
+            {
+                // TODO implement more logic here
+                new LinkCheckAnswer((uint)rxpk.Rssi, 1);
+            }
+
+            // Check for Mac cloud to devices requests.
+            if (cloudToDeviceMessage.Properties.TryGetValueCaseInsensitive("cidtype", out var cidTypeValue))
+            {
+                Logger.Log(devEUI, "Cloud to device MAC command received", LogLevel.Information);
+                try
+                {
+                    var macCmd = MacCommand.CreateMacCommandFromC2DMessage(cidTypeValue, cloudToDeviceMessage.Properties);
+                    if (!macCommands.TryAdd((int)macCmd.Cid, macCmd))
+                    {
+                        Logger.Log(devEUI, $"Could not send the C2D Mac Command {macCmd.Cid}, as such a property was already present in the message. Please resend the C2D", LogLevel.Error);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log(devEUI, ex.ToString(), LogLevel.Error);
+                }
+            }
+
+            // TODO Implement ADR control Logic
+            return macCommands.Values;
         }
     }
 }
