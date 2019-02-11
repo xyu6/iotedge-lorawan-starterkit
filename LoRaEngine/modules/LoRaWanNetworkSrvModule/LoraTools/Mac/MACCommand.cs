@@ -5,6 +5,7 @@ namespace LoRaTools
 {
     using System;
     using System.Collections.Generic;
+    using LoRaTools.Mac;
     using LoRaWan;
     using Microsoft.Extensions.Logging;
 
@@ -42,14 +43,22 @@ namespace LoRaTools
         /// <returns>the Mac command</returns>
         public static MacCommand CreateMacCommandFromC2DMessage(string cidType, IDictionary<string, string> properties)
         {
-            Enum.TryParse(cidType, out CidEnum cid);
+            if (!Enum.TryParse(cidType, out CidEnum cid))
+            {
+                throw new MacCommandException("Could not parse the cid enum");
+            }
+
             MacCommand macCommand = null;
             switch (cid)
             {
                 case CidEnum.LinkCheckCmd:
                     // TODO ignore case
-                    uint.TryParse(properties["margin"], out uint margin);
-                    uint.TryParse(properties["gatewayCount"], out uint gatewayCount);
+                    if (!uint.TryParse(properties["margin"], out uint margin) ||
+                    !uint.TryParse(properties["gatewayCount"], out uint gatewayCount))
+                    {
+                        throw new MacCommandException("Could not parse margin or gatewayCount argument");
+                    }
+
                     macCommand = new LinkCheckAnswer(margin, gatewayCount);
                     break;
                 case CidEnum.LinkADRCmd:
@@ -87,51 +96,50 @@ namespace LoRaTools
                 switch (cid)
                 {
                     case CidEnum.LinkCheckCmd:
-                        Logger.Log("mac command detected : LinkCheckCmd", LogLevel.Information);
-                        LinkCheckAnswer linkCheck = new LinkCheckAnswer((uint)input.Span[pointer + 1], (uint)input.Span[pointer + 2]);
+                        LinkCheckRequest linkCheck = new LinkCheckRequest();
                         pointer += linkCheck.Length;
                         macCommands.Add(linkCheck);
                         break;
                     case CidEnum.LinkADRCmd:
-                        Logger.Log("mac command detected : LinkADRCmd", LogLevel.Information);
                         var linkAdrAnswer = new LinkADRAnswer(input.Span.Slice(pointer));
                         pointer += linkAdrAnswer.Length;
                         macCommands.Add(linkAdrAnswer);
                         break;
                     case CidEnum.DutyCycleCmd:
-                        Logger.Log("mac command detected : DutyCycleCmd", LogLevel.Information);
                         var dutyCycle = new DutyCycleAnswer();
                         pointer += dutyCycle.Length;
                         macCommands.Add(dutyCycle);
                         break;
                     case CidEnum.RXParamCmd:
-                        Logger.Log("mac command detected : RXParamCmd", LogLevel.Information);
                         var rxParamSetup = new RXParamSetupAnswer(input.Span.Slice(pointer));
                         pointer += rxParamSetup.Length;
                         macCommands.Add(rxParamSetup);
                         break;
                     case CidEnum.DevStatusCmd:
-                        Logger.Log("mac command detected : DevStatusCmd", LogLevel.Information);
                         DevStatusAnswer devStatus = new DevStatusAnswer(input.Span.Slice(pointer));
                         pointer += devStatus.Length;
                         macCommands.Add(devStatus);
                         break;
                     case CidEnum.NewChannelCmd:
-                        Logger.Log("mac command detected : NewChannelCmd", LogLevel.Information);
                         NewChannelAnswer newChannel = new NewChannelAnswer(input.Span.Slice(pointer));
                         pointer += newChannel.Length;
                         macCommands.Add(newChannel);
                         break;
                     case CidEnum.RXTimingCmd:
-                        Logger.Log("mac command detected : RXTimingCmd", LogLevel.Information);
                         RXTimingSetupAnswer rxTimingSetup = new RXTimingSetupAnswer();
                         pointer += rxTimingSetup.Length;
                         macCommands.Add(rxTimingSetup);
                         break;
+                    default:
+                        Logger.Log($"A transmitted Mac Command value ${input.Span[pointer]} was not from a supported type. Aborting Mac Command processing", LogLevel.Error);
+                        return null;
                 }
+
+                MacCommand addedMacCommand = macCommands[macCommands.Count - 1];
+                Logger.Log($"{addedMacCommand.Cid} mac command detected in upstream payload: {addedMacCommand.ToString()}", LogLevel.Debug);
             }
 
-            return null;
+            return macCommands;
         }
     }
 

@@ -8,6 +8,7 @@ namespace LoRaTools.LoRaMessage
     using System.Linq;
     using System.Runtime.InteropServices;
     using LoRaTools.LoRaPhysical;
+    using LoRaTools.Mac;
     using LoRaTools.Utils;
     using LoRaWan;
     using Microsoft.Azure.Devices.Client;
@@ -36,9 +37,9 @@ namespace LoRaTools.LoRaMessage
     public class LoRaPayloadData : LoRaPayload
     {
         /// <summary>
-        /// List of Mac Commands in the LoRaPayload
+        /// Gets or sets list of Mac Commands in the LoRaPayload
         /// </summary>
-        private List<MacCommand> macCommands;
+        public List<MacCommand> MacCommands { get; set; }
 
         /// <summary>
         /// Gets the LoRa payload fport as value
@@ -71,6 +72,11 @@ namespace LoRaTools.LoRaMessage
         {
             return this.LoRaMessageType == LoRaMessageType.ConfirmedDataDown || this.LoRaMessageType == LoRaMessageType.ConfirmedDataUp;
         }
+
+        /// <summary>
+        /// Get the MacCommands
+        /// </summary>
+        public List<MacCommand> GetMacCommands() => this.MacCommands;
 
         /// <summary>
         /// Indicates if the payload is an confirmation message acknowledgement
@@ -156,11 +162,7 @@ namespace LoRaTools.LoRaMessage
             // Populate the MacCommands present in the payload.
             if (foptsSize > 0)
             {
-                this.macCommands = MacCommand.CreateMacCommandFromBytes(this.Fopts);
-            }
-            else if (this.Fport.Span[0] == (byte)0)
-            {
-                this.macCommands = MacCommand.CreateMacCommandFromBytes(this.Frmpayload);
+                this.MacCommands = MacCommand.CreateMacCommandFromBytes(this.Fopts);
             }
 
             this.Mic = new Memory<byte>(inputMessage, inputMessage.Length - 4, 4);
@@ -172,12 +174,12 @@ namespace LoRaTools.LoRaMessage
         /// </summary>
         public LoRaPayloadData(LoRaMessageType mhdr, byte[] devAddr, byte[] fctrl, byte[] fcnt, ICollection<MacCommand> macCommands, byte[] fPort, byte[] frmPayload, int direction)
         {
-            IEnumerable<byte> macBytes = new List<byte>();
+            List<byte> macBytes = new List<byte>();
             if (macCommands != null)
             {
                 foreach (var macCommand in macCommands)
                 {
-                    macBytes.Concat(macCommand.ToBytes());
+                    macBytes.AddRange(macCommand.ToBytes());
                 }
             }
 
@@ -185,6 +187,17 @@ namespace LoRaTools.LoRaMessage
             int fOptsLen = fOpts == null ? 0 : fOpts.Length;
             int frmPayloadLen = frmPayload == null ? 0 : frmPayload.Length;
             int fPortLen = fPort == null ? 0 : fPort.Length;
+
+            // TODO If there are mac commands to send and no payload, we need to put the mac commands in the frmpayload.
+            if (macBytes?.Count > 0 && frmPayload?.Count() == 0)
+            {
+                frmPayload = fOpts;
+                fOpts = null;
+                fOptsLen = 0;
+                frmPayloadLen = frmPayload.Count();
+                fPortLen = 1;
+                fPort = new byte[1] { 0 };
+            }
 
             int macPyldSize = devAddr.Length + fctrl.Length + fcnt.Length + fOptsLen + frmPayloadLen + fPortLen;
             this.RawMessage = new byte[1 + macPyldSize + 4];
@@ -261,7 +274,16 @@ namespace LoRaTools.LoRaMessage
         /// <returns>the Downlink message</returns>
         public DownlinkPktFwdMessage Serialize(string appSKey, string nwkSKey, string datr, double freq, long tmst, string devEUI)
         {
-            this.PerformEncryption(appSKey);
+            // It is a Mac COmmand payload, need to encrypt with nwkskey
+            if (this.GetFPort() == 0)
+            {
+                this.PerformEncryption(nwkSKey);
+            }
+            else
+            {
+                this.PerformEncryption(appSKey);
+            }
+
             this.SetMic(nwkSKey);
             var downlinkPktFwdMessage = new DownlinkPktFwdMessage(this.GetByteMessage(), datr, freq, tmst);
             if (Logger.LoggerLevel < LogLevel.Information)
@@ -446,28 +468,12 @@ namespace LoRaTools.LoRaMessage
         /// </summary>
         public void AddMacCommand(MacCommand mac)
         {
-            if (this.macCommands == null)
+            if (this.MacCommands == null)
             {
-                this.macCommands = new List<MacCommand>();
+                this.MacCommands = new List<MacCommand>();
             }
 
-            this.macCommands.Add(mac);
-        }
-
-        /// <summary>
-        /// Send detected MAC commands as message properties.
-        /// </summary>
-        public void ProcessAndSendMacCommands(ref Dictionary<string, string> eventProperties)
-        {
-           if (this.macCommands?.Count > 0)
-            {
-                eventProperties = eventProperties ?? new Dictionary<string, string>();
-
-                for (int i = 0; i < this.macCommands.Count; i++)
-                {
-                    eventProperties[this.macCommands[i].Cid.ToString()] = JsonConvert.SerializeObject(this.macCommands[i].ToString(), Formatting.None);
-                }
-            }
+            this.MacCommands.Add(mac);
         }
 
         /// <summary>
@@ -475,43 +481,7 @@ namespace LoRaTools.LoRaMessage
         /// </summary>
         public bool IsMacAnswerRequired()
         {
-            return this.macCommands.Where(x => x.Cid == CidEnum.LinkCheckCmd).Count() > 0 ? true : false;
-        }
-
-        /// <summary>
-        /// Prepare the Mac Commands to be sent in the downstream message.
-        /// </summary>
-        public ICollection<MacCommand> PrepareMacCommandAnswer(string devEUI, Message cloudToDeviceMessage, Rxpk rxpk)
-        {
-            Dictionary<int, MacCommand> macCommands = new Dictionary<int, MacCommand>();
-
-            // Check if the device sent a Mac Command requiring a response.
-            if (this.IsMacAnswerRequired())
-            {
-                // TODO implement more logic here
-                new LinkCheckAnswer((uint)rxpk.Rssi, 1);
-            }
-
-            // Check for Mac cloud to devices requests.
-            if (cloudToDeviceMessage.Properties.TryGetValueCaseInsensitive("cidtype", out var cidTypeValue))
-            {
-                Logger.Log(devEUI, "Cloud to device MAC command received", LogLevel.Information);
-                try
-                {
-                    var macCmd = MacCommand.CreateMacCommandFromC2DMessage(cidTypeValue, cloudToDeviceMessage.Properties);
-                    if (!macCommands.TryAdd((int)macCmd.Cid, macCmd))
-                    {
-                        Logger.Log(devEUI, $"Could not send the C2D Mac Command {macCmd.Cid}, as such a property was already present in the message. Please resend the C2D", LogLevel.Error);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log(devEUI, ex.ToString(), LogLevel.Error);
-                }
-            }
-
-            // TODO Implement ADR control Logic
-            return macCommands.Values;
+            return this.MacCommands?.Where(x => x.Cid == CidEnum.LinkCheckCmd).Count() > 0 ? true : false;
         }
     }
 }

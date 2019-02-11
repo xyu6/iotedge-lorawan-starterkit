@@ -5,11 +5,13 @@ namespace LoRaWan.NetworkServer
 {
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using System.Text;
     using System.Threading.Tasks;
     using LoRaTools;
     using LoRaTools.LoRaMessage;
     using LoRaTools.LoRaPhysical;
+    using LoRaTools.Mac;
     using LoRaTools.Regions;
     using LoRaTools.Utils;
     using Microsoft.Azure.Devices.Client;
@@ -35,6 +37,9 @@ namespace LoRaWan.NetworkServer
 
         // Name of the upstream message property reporint a confirmed message
         internal const string C2D_MSG_PROPERTY_VALUE_NAME = "C2DMsgConfirmed";
+
+        // Name of the mac command message property
+        internal const string C2D_MSG_PROPERTY_MAC_COMMAND = "CidType";
 
         private readonly NetworkServerConfiguration configuration;
         private readonly ILoRaDeviceRegistry deviceRegistry;
@@ -139,7 +144,7 @@ namespace LoRaWan.NetworkServer
                 var frameCounterStrategy = isMultiGateway ? this.frameCounterUpdateStrategyFactory.GetMultiGatewayStrategy() : this.frameCounterUpdateStrategyFactory.GetSingleGatewayStrategy();
 
                 var payloadFcnt = loraPayload.GetFcnt();
-                var requiresConfirmation = loraPayload.IsConfirmed();
+                var requiresConfirmation = loraPayload.IsConfirmed() || loraPayload.IsMacAnswerRequired();
 
                 using (new LoRaDeviceFrameCounterSession(loRaDevice, frameCounterStrategy))
                 {
@@ -211,7 +216,6 @@ namespace LoRaWan.NetworkServer
                         Logger.Log(loRaDevice.DevEUI, $"down frame counter: {loRaDevice.FCntDown}", LogLevel.Information);
                     }
 
-                    var requiresMacCommandAnswer = false;
                     if (!isConfirmedResubmit)
                     {
                         var validFcntUp = isFrameCounterFromNewlyStartedDevice || (payloadFcnt > loRaDevice.FCntUp);
@@ -229,7 +233,16 @@ namespace LoRaWan.NetworkServer
                                 byte[] decryptedPayloadData = null;
                                 try
                                 {
-                                    decryptedPayloadData = loraPayload.GetDecryptedPayload(loRaDevice.AppSKey);
+                                    // In case of a Mac command only payload
+                                    if (loraPayload.GetFPort() == LORA_FPORT_RESERVED_MAC_MSG)
+                                    {
+                                        loraPayload.MacCommands = MacCommand.CreateMacCommandFromBytes(loraPayload.GetDecryptedPayload(loRaDevice.NwkSKey));
+                                        requiresConfirmation = loraPayload.IsConfirmed() || loraPayload.IsMacAnswerRequired();
+                                    }
+                                    else
+                                    {
+                                        decryptedPayloadData = loraPayload.GetDecryptedPayload(loRaDevice.AppSKey);
+                                    }
                                 }
                                 catch (Exception ex)
                                 {
@@ -238,27 +251,32 @@ namespace LoRaWan.NetworkServer
 
                                 var fportUp = loraPayload.GetFPort();
 
-                                if (string.IsNullOrEmpty(loRaDevice.SensorDecoder))
+                                // If contains a command only payload
+                                if (decryptedPayloadData != null)
                                 {
-                                    Logger.Log(loRaDevice.DevEUI, $"no decoder set in device twin. port: {fportUp}", LogLevel.Debug);
-                                    payloadData = Convert.ToBase64String(decryptedPayloadData);
-                                }
-                                else
-                                {
-                                    Logger.Log(loRaDevice.DevEUI, $"decoding with: {loRaDevice.SensorDecoder} port: {fportUp}", LogLevel.Debug);
-                                    payloadData = await this.payloadDecoder.DecodeMessageAsync(decryptedPayloadData, fportUp, loRaDevice.SensorDecoder);
+                                    if (string.IsNullOrEmpty(loRaDevice.SensorDecoder))
+                                    {
+                                        Logger.Log(loRaDevice.DevEUI, $"no decoder set in device twin. port: {fportUp}", LogLevel.Debug);
+                                        payloadData = Convert.ToBase64String(decryptedPayloadData);
+                                    }
+                                    else
+                                    {
+                                        Logger.Log(loRaDevice.DevEUI, $"decoding with: {loRaDevice.SensorDecoder} port: {fportUp}", LogLevel.Debug);
+                                        payloadData = await this.payloadDecoder.DecodeMessageAsync(decryptedPayloadData, fportUp, loRaDevice.SensorDecoder);
+                                    }
                                 }
                             }
 
-                            if (!await this.SendDeviceEventAsync(loRaDevice, rxpk, payloadData, loraPayload, timeWatcher))
+                            if (loraPayload.GetFPort() != LORA_FPORT_RESERVED_MAC_MSG)
                             {
-                                // failed to send event to IoT Hub, stop now
-                                return null;
+                                if (!await this.SendDeviceEventAsync(loRaDevice, rxpk, payloadData, loraPayload, timeWatcher))
+                                {
+                                    // failed to send event to IoT Hub, stop now
+                                    return null;
+                                }
                             }
 
                             loRaDevice.SetFcntUp(payloadFcnt);
-                            if (loraPayload.IsMacAnswerRequired())
-                                requiresMacCommandAnswer = true;
                         }
                         else
                         {
@@ -282,7 +300,7 @@ namespace LoRaWan.NetworkServer
                     // If it is confirmed and
                     // - Downlink is disabled for the device or
                     // - we don't have time to check c2d and send to device we return now
-                    if ((requiresConfirmation || requiresMacCommandAnswer) && (!loRaDevice.DownlinkEnabled || timeToSecondWindow.Subtract(LoRaOperationTimeWatcher.ExpectedTimeToPackageAndSendMessage) <= LoRaOperationTimeWatcher.MinimumAvailableTimeToCheckForCloudMessage))
+                    if (requiresConfirmation && (!loRaDevice.DownlinkEnabled || timeToSecondWindow.Subtract(LoRaOperationTimeWatcher.ExpectedTimeToPackageAndSendMessage) <= LoRaOperationTimeWatcher.MinimumAvailableTimeToCheckForCloudMessage))
                     {
                         return this.CreateDownlinkMessage(
                             null,
@@ -360,7 +378,7 @@ namespace LoRaWan.NetworkServer
                     }
 
                     // No C2D message and request was not confirmed, return nothing
-                    if (!requiresConfirmation && !requiresMacCommandAnswer)
+                    if (!requiresConfirmation)
                     {
                         return null;
                     }
@@ -414,7 +432,7 @@ namespace LoRaWan.NetworkServer
                 fctrl = (byte)FctrlEnum.Ack;
             }
 
-            ICollection<MacCommand> macCommands = upstreamPayload.PrepareMacCommandAnswer(loRaDevice.DevEUI, cloudToDeviceMessage, rxpk);
+            ICollection<MacCommand> macCommands = this.PrepareMacCommandAnswer(loRaDevice.DevEUI,  upstreamPayload, cloudToDeviceMessage, rxpk);
 
             byte? fport = null;
             var requiresDeviceAcknowlegement = false;
@@ -442,7 +460,7 @@ namespace LoRaWan.NetworkServer
 
                 frmPayload = cloudToDeviceMessage?.GetBytes();
 
-                Logger.Log(loRaDevice.DevEUI, $"C2D message: {Encoding.UTF8.GetString(frmPayload)}, id: {cloudToDeviceMessage.MessageId ?? "undefined"}, fport: {fport}, confirmed: {requiresDeviceAcknowlegement}", LogLevel.Information);
+                Logger.Log(loRaDevice.DevEUI, $"C2D message: {Encoding.UTF8.GetString(frmPayload)}, id: {cloudToDeviceMessage.MessageId ?? "undefined"}, fport: {fport ?? 0}, confirmed: {requiresDeviceAcknowlegement}, macCommand: {(macCommands.Count > 0 ? true : false)}", LogLevel.Information);
 
                 // cut to the max payload of lora for any EU datarate
                 if (frmPayload.Length > 51)
@@ -526,6 +544,19 @@ namespace LoRaWan.NetworkServer
 
         private bool ValidateCloudToDeviceMessage(LoRaDevice loRaDevice, Message cloudToDeviceMsg)
         {
+            // If a C2D message contains a Mac command we don't need to set the fport.
+            if (cloudToDeviceMsg.Properties.TryGetValueCaseInsensitive(C2D_MSG_PROPERTY_MAC_COMMAND, out var macCommand))
+            {
+                if (!Enum.TryParse(macCommand, out CidEnum cid))
+                {
+                    Logger.Log(loRaDevice.DevEUI, $"CidEnum type of C2D mac Command {macCommand} could not be parsed", LogLevel.Error);
+                }
+                else
+                {
+                    return true;
+                }
+            }
+
             // ensure fport property has been set
             if (!cloudToDeviceMsg.Properties.TryGetValueCaseInsensitive(FPORT_MSG_PROPERTY_KEY, out var fportValue))
             {
@@ -565,7 +596,7 @@ namespace LoRaWan.NetworkServer
                 loRaDevice.LastConfirmedC2DMessageID = null;
             }
 
-            loRaPayloadData.ProcessAndSendMacCommands(ref eventProperties);
+            this.ProcessAndSendMacCommands(loRaPayloadData, ref eventProperties);
 
             if (await loRaDevice.SendEventAsync(deviceTelemetry, eventProperties))
             {
@@ -762,6 +793,66 @@ namespace LoRaWan.NetworkServer
                 null);
 
             return loRaPayloadJoinAccept.Serialize(appKey, datr, freq, tmst, devEUI);
+        }
+
+        /// <summary>
+        /// Send detected MAC commands as message properties.
+        /// </summary>
+        public void ProcessAndSendMacCommands(LoRaPayloadData payloadData, ref Dictionary<string, string> eventProperties)
+        {
+            var macCommands = payloadData.GetMacCommands();
+            if (macCommands?.Count > 0)
+            {
+                eventProperties = eventProperties ?? new Dictionary<string, string>();
+
+                for (int i = 0; i < macCommands.Count; i++)
+                {
+                    eventProperties[macCommands[i].Cid.ToString()] = JsonConvert.SerializeObject(macCommands[i].ToString(), Formatting.None);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Prepare the Mac Commands to be sent in the downstream message.
+        /// </summary>
+        public ICollection<MacCommand> PrepareMacCommandAnswer(string devEUI, LoRaPayloadData loRaPayload, Message cloudToDeviceMessage, Rxpk rxpk)
+        {
+            Dictionary<int, MacCommand> macCommands = new Dictionary<int, MacCommand>();
+
+            // Check if the device sent a Mac Command requiring a response. Currently only LinkCheck requires an answer.
+            if (loRaPayload.IsMacAnswerRequired())
+            {
+                var spreadFactorToSnr = rxpk.GetSpreadFactorToSNR();
+                // Todo, check how I could see how many gateway received the message
+                var linkCheckAnswer = new LinkCheckAnswer(rxpk.GetModulationMargin(), 1);
+                macCommands.Add(
+                    (int)CidEnum.LinkCheckCmd,
+                    linkCheckAnswer);
+            }
+
+            if (cloudToDeviceMessage != null)
+            {
+                // Check for Mac cloud to devices requests.
+                if (cloudToDeviceMessage.Properties.TryGetValueCaseInsensitive("cidtype", out var cidTypeValue))
+                {
+                    Logger.Log(devEUI, $"Cloud to device MAC command {cidTypeValue} received", LogLevel.Information);
+                    try
+                    {
+                        var macCmd = MacCommand.CreateMacCommandFromC2DMessage(cidTypeValue, cloudToDeviceMessage.Properties);
+                        if (!macCommands.TryAdd((int)macCmd.Cid, macCmd))
+                        {
+                            Logger.Log(devEUI, $"Could not send the C2D Mac Command {cidTypeValue}, as such a property was already present in the message. Please resend the C2D", LogLevel.Error);
+                        }
+                    }
+                    catch (MacCommandException ex)
+                    {
+                        Logger.Log(devEUI, ex.ToString(), LogLevel.Error);
+                    }
+                }
+            }
+
+            // TODO Implement ADR control Logic
+            return macCommands.Values;
         }
     }
 }

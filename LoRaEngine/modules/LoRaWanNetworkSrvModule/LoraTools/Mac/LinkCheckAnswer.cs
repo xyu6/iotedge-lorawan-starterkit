@@ -31,13 +31,15 @@ namespace LoRaTools
         public override IEnumerable<byte> ToBytes()
         {
             List<byte> returnedBytes = new List<byte>();
-            returnedBytes[0] = (byte)this.Cid;
+            returnedBytes.Add((byte)this.Cid);
+            returnedBytes.Add((byte)this.Margin);
+            returnedBytes.Add((byte)this.GwCnt);
             return returnedBytes;
         }
 
         public override string ToString()
         {
-            throw new NotImplementedException();
+            return $"Margin: {this.Margin}, gateway count : {this.GwCnt}";
         }
     }
 }
