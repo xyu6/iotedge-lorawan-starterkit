@@ -11,6 +11,16 @@ namespace LoRaWan.NetworkServer
 
     public class LoRaMessage : ILoRaMessage
     {
+        public string DevEui { get; set; }
+
+        public int Fport { get; set; }
+
+        public bool Confirmed { get; set; }
+
+        public string Data { get; set; }
+
+        public string DataString { get; set; }
+
         public Message Message { get; set; }
 
         public string DecoderUrl { get; set; }
