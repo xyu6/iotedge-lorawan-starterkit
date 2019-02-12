@@ -9,7 +9,7 @@ namespace SensorDecoderModule.Classes
 
     internal static class LoraDecoders
     {
-        private static string DecoderValueSensor(byte[] payload, uint fport)
+        private static string DecoderValueSensor(byte[] payload, uint fport, string devEui)
         {
             // EITHER: Convert a payload containing a string back to string format for further processing
             var result = Encoding.UTF8.GetString(payload);
@@ -23,7 +23,7 @@ namespace SensorDecoderModule.Classes
             return JsonConvert.SerializeObject(new ValueSensorResponse { Value = result });
         }
 
-        private static string DecoderValueSensorWithDeviceMessage(byte[] payload, uint fport)
+        private static string DecoderValueSensorWithDeviceMessage(byte[] payload, uint fport, string devEui)
         {
             // Create DecoderResponse object
             DecoderResponse decoderResponse = new DecoderResponse();
@@ -33,18 +33,20 @@ namespace SensorDecoderModule.Classes
             {
                 Value = Encoding.UTF8.GetString(payload)
             };
+
             decoderResponse.DecodedMessage = decodedMessage;
 
             // Create Decoder 2 Device message.
             // If DevEUI is empty, the response will be sent to the device that sent the upsteam message that we are decoding.
             var deviceMessage = new DeviceMessage
             {
-                DevEUI = null,
+                DevEUI = devEui,
                 Fport = fport,
                 Confirmed = false,
                 Data = ConversionHelper.Base64Encode("message to device"),
                 Data_string = "message to device",
             };
+
             deviceMessage.MacCommands.Add(new MacCommand { Cid = 1, Params = "Sample Params" });
             decoderResponse.DeviceMessage = deviceMessage;
                        

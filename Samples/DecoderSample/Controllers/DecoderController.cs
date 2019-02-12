@@ -17,7 +17,7 @@ namespace SensorDecoderModule.Controllers
         [HttpGet("{decoder}", Name = "Get")]
         [ProducesResponseType(200)]
         [ProducesResponseType(400)]
-        public ActionResult<string> Get(string decoder, string fport, string payload)
+        public ActionResult<string> Get(string decoder, string fport, string payload, string deveui)
         {
             // Validate that fport and payload URL parameters are present.
             Validator.ValidateParameters(fport, payload);
@@ -27,7 +27,7 @@ namespace SensorDecoderModule.Controllers
 
             if (toInvoke != null)
             {
-                return (string)toInvoke.Invoke(null, new object[] { Convert.FromBase64String(payload), Convert.ToUInt16(fport) });
+                return (string)toInvoke.Invoke(null, new object[] { Convert.FromBase64String(payload), Convert.ToUInt16(fport), deveui });
             }
             else
             {

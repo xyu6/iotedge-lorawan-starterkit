@@ -11,17 +11,6 @@ namespace SensorDecoderModule.Classes
     using Newtonsoft.Json;
     using Newtonsoft.Json.Linq;
 
-    public static class ResponseHelper
-    {
-        public static string BuildResponse(object decodedMessage, DeviceMessage deviceMessage)
-        {
-            JObject jobject = new JObject();
-            jobject["decoded_message"] = (JObject)JToken.FromObject(decodedMessage);
-            jobject["device_message"] = (JObject)JToken.FromObject(deviceMessage);
-            return JsonConvert.SerializeObject(jobject);
-        }
-    }
-
     public class DecoderResponse
     {
         public object DecodedMessage { get; set; }
