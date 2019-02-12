@@ -19,36 +19,42 @@ namespace SensorDecoderModule.Classes
 
             // Write code that decodes the payload here.
 
-            // Return a JSON string containing the decoded data
-            return JsonConvert.SerializeObject(new ValueSensorResponse { value = result });
+            // Return a JSON string containing the decoded data. This is your message structure. Object sample code below.
+            return JsonConvert.SerializeObject(new ValueSensorResponse { Value = result });
         }
 
         private static string DecoderValueSensorWithDeviceMessage(byte[] payload, uint fport)
         {
-            // Decode payload
+            // Create DecoderResponse object
+            DecoderResponse decoderResponse = new DecoderResponse();
+
+            // Decode payload. This is your message structure. Object sample code below.
             var decodedMessage = new ValueSensorResponse
             {
-                value = Encoding.UTF8.GetString(payload)
+                Value = Encoding.UTF8.GetString(payload)
             };
+            decoderResponse.DecodedMessage = decodedMessage;
 
-            // Create Decoder 2 Device message
+            // Create Decoder 2 Device message.
+            // If DevEUI is empty, the response will be sent to the device that sent the upsteam message that we are decoding.
             var deviceMessage = new DeviceMessage
             {
-                devEUI = null,
-                fport = fport,
-                confirmed = false,
-                data = ConversionHelper.Base64Encode("message to device"),
-                data_string = "message to device",
+                DevEUI = null,
+                Fport = fport,
+                Confirmed = false,
+                Data = ConversionHelper.Base64Encode("message to device"),
+                Data_string = "message to device",
             };
-            deviceMessage.macCommands.Add(new MacCommand { cid = 1 });
-
-            // Return a JSON string containing the decoded data
-            return ResponseHelper.BuildResponse(decodedMessage, deviceMessage);
+            deviceMessage.MacCommands.Add(new MacCommand { Cid = 1, Params = "Sample Params" });
+            decoderResponse.DeviceMessage = deviceMessage;
+                       
+            // Return a JSON string containing the Decoder Response object
+            return JsonConvert.SerializeObject(decoderResponse);
         }
     }
 
     public class ValueSensorResponse
     {
-        public string value { get; set; }
+        public string Value { get; set; }
     }
 }

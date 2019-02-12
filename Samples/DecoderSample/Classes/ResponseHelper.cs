@@ -22,28 +22,36 @@ namespace SensorDecoderModule.Classes
         }
     }
 
+    public class DecoderResponse
+    {
+        public object DecodedMessage { get; set; }
+
+        public DeviceMessage DeviceMessage { get; set; }
+    }
+           
     public class DeviceMessage
     {
-        public string devEUI { get; set; }
+        public string DevEUI { get; set; }
 
-        public uint fport { get; set; }
+        public uint Fport { get; set; }
 
-        public bool confirmed { get; set; }
+        public bool Confirmed { get; set; }
 
-        public string data { get; set; }
+        public string Data { get; set; }
 
-        public string data_string { get; set; }
+        public string Data_string { get; set; }
 
-        public List<MacCommand>  macCommands { get; set; }
+        public List<MacCommand>  MacCommands { get; set; }
 
         public DeviceMessage()
         {
-            this.macCommands = new List<MacCommand>();
+            this.MacCommands = new List<MacCommand>();
         }
     }
 
     public class MacCommand
     {
-        public int cid { get; set; }
+        public int Cid { get; set; }
+        public string Params { get; set; }
     }
 }
