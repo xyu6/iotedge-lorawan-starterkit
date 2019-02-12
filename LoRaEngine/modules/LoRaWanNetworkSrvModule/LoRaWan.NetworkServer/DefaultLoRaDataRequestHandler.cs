@@ -135,7 +135,7 @@ namespace LoRaWan.NetworkServer
                                 // In case if the mac command is inside the mac payload, we need to decrypt it.
                                 if (loraPayload.GetFPort() == Constants.LORA_FPORT_RESERVED_MAC_MSG)
                                 {
-                                    loraPayload.MacCommands = MacCommand.CreateMacCommandFromBytes(loraPayload.GetDecryptedPayload(loRaDevice.NwkSKey));
+                                    loraPayload.MacCommands = MacCommand.CreateMacCommandFromBytes(loRaDevice.DevEUI, loraPayload.GetDecryptedPayload(loRaDevice.NwkSKey));
                                     requiresConfirmation = loraPayload.IsConfirmed() || loraPayload.IsMacAnswerRequired();
                                 }
                                 else
@@ -348,11 +348,12 @@ namespace LoRaWan.NetworkServer
                 // ensure fport follows LoRa specification
                 // 0    => reserved for mac commands
                 // 224+ => reserved for future applications
-                if (fport != Constants.LORA_FPORT_RESERVED_MAC_MSG && fport < Constants.LORA_FPORT_RESERVED_FUTURE_START)
-                    return true;
+                if (fport == Constants.LORA_FPORT_RESERVED_MAC_MSG && fport >= Constants.LORA_FPORT_RESERVED_FUTURE_START)
+                {
+                    Logger.Log(loRaDevice.DevEUI, $"invalid fport '{fportValue}' in C2D message '{cloudToDeviceMsg.MessageId}'", LogLevel.Error);
+                    return false;
+                }
             }
-
-            Logger.Log(loRaDevice.DevEUI, $"invalid fport '{fportValue}' in C2D message '{cloudToDeviceMsg.MessageId}'", LogLevel.Error);
 
             return containMacCommand;
         }
@@ -559,7 +560,7 @@ namespace LoRaWan.NetworkServer
                 {
                     try
                     {
-                        var macCmd = MacCommand.CreateMacCommandFromC2DMessage(devEUI, cidTypeValue, cloudToDeviceMessage.Properties);
+                        var macCmd = MacCommand.CreateMacCommandFromC2DMessage(cidTypeValue, cloudToDeviceMessage.Properties);
                         if (!macCommands.TryAdd((int)macCmd.Cid, macCmd))
                         {
                             Logger.Log(devEUI, $"Could not send the C2D Mac Command {cidTypeValue}, as such a property was already present in the message. Please resend the C2D", LogLevel.Error);

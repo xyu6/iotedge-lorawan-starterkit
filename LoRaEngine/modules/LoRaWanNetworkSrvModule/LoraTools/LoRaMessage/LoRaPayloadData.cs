@@ -170,7 +170,7 @@ namespace LoRaTools.LoRaMessage
             // Populate the MacCommands present in the payload.
             if (foptsSize > 0)
             {
-                this.MacCommands = MacCommand.CreateMacCommandFromBytes(this.DevAddr,this.Fopts);
+                this.MacCommands = MacCommand.CreateMacCommandFromBytes(ConversionHelper.ByteArrayToString(this.DevAddr), this.Fopts);
             }
 
             this.Mic = new Memory<byte>(inputMessage, inputMessage.Length - 4, 4);

@@ -236,7 +236,7 @@ namespace LoRaWan.NetworkServer
                                     // In case of a Mac command only payload
                                     if (loraPayload.GetFPort() == LORA_FPORT_RESERVED_MAC_MSG)
                                     {
-                                        loraPayload.MacCommands = MacCommand.CreateMacCommandFromBytes(loraPayload.GetDecryptedPayload(loRaDevice.NwkSKey));
+                                        loraPayload.MacCommands = MacCommand.CreateMacCommandFromBytes(loRaDevice.DevEUI, loraPayload.GetDecryptedPayload(loRaDevice.NwkSKey));
                                         requiresConfirmation = loraPayload.IsConfirmed() || loraPayload.IsMacAnswerRequired();
                                     }
                                     else

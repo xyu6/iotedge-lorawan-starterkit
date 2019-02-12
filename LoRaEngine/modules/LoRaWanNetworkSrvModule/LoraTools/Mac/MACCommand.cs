@@ -147,7 +147,7 @@ namespace LoRaTools
                 }
 
                 MacCommand addedMacCommand = macCommands[macCommands.Count - 1];
-                Logger.Log(deviceId,$"{addedMacCommand.Cid} mac command detected in upstream payload: {addedMacCommand.ToString()}", LogLevel.Debug);
+                Logger.Log(deviceId, $"{addedMacCommand.Cid} mac command detected in upstream payload: {addedMacCommand.ToString()}", LogLevel.Debug);
             }
 
             return macCommands;
