@@ -85,7 +85,7 @@ namespace LoRaTools
         /// <summary>
         /// Create a List of Mac commands based on a sequence of bytes.
         /// </summary>
-        public static List<MacCommand> CreateMacCommandFromBytes(ReadOnlyMemory<byte> input)
+        public static List<MacCommand> CreateMacCommandFromBytes(string deviceId, ReadOnlyMemory<byte> input)
         {
             int pointer = 0;
             var macCommands = new List<MacCommand>();
@@ -116,9 +116,20 @@ namespace LoRaTools
                         macCommands.Add(rxParamSetup);
                         break;
                     case CidEnum.DevStatusCmd:
-                        DevStatusAnswer devStatus = new DevStatusAnswer(input.Span.Slice(pointer));
-                        pointer += devStatus.Length;
-                        macCommands.Add(devStatus);
+                        // Added this case to enable unit testing
+                        if (input.Length == 1)
+                        {
+                            var devStatusRequest = new DevStatusRequest();
+                            pointer += devStatusRequest.Length;
+                            macCommands.Add(devStatusRequest);
+                        }
+                        else
+                        {
+                            DevStatusAnswer devStatus = new DevStatusAnswer(input.Span.Slice(pointer));
+                            pointer += devStatus.Length;
+                            macCommands.Add(devStatus);
+                        }
+
                         break;
                     case CidEnum.NewChannelCmd:
                         NewChannelAnswer newChannel = new NewChannelAnswer(input.Span.Slice(pointer));
@@ -136,7 +147,7 @@ namespace LoRaTools
                 }
 
                 MacCommand addedMacCommand = macCommands[macCommands.Count - 1];
-                Logger.Log($"{addedMacCommand.Cid} mac command detected in upstream payload: {addedMacCommand.ToString()}", LogLevel.Debug);
+                Logger.Log(deviceId,$"{addedMacCommand.Cid} mac command detected in upstream payload: {addedMacCommand.ToString()}", LogLevel.Debug);
             }
 
             return macCommands;

@@ -333,26 +333,26 @@ namespace LoRaWan.NetworkServer
                 }
             }
 
-            if (cloudToDeviceMsg.GetBytes().Length > 0)
+            // ensure fport property has been set
+            if (!cloudToDeviceMsg.Properties.TryGetValueCaseInsensitive(Constants.FPORT_MSG_PROPERTY_KEY, out var fportValue))
             {
-                // ensure fport property has been set
-                if (!cloudToDeviceMsg.Properties.TryGetValueCaseInsensitive(Constants.FPORT_MSG_PROPERTY_KEY, out var fportValue))
-                {
-                    Logger.Log(loRaDevice.DevEUI, $"missing {Constants.FPORT_MSG_PROPERTY_KEY} property in C2D message '{cloudToDeviceMsg.MessageId}'", LogLevel.Error);
+                Logger.Log(loRaDevice.DevEUI, $"missing {Constants.FPORT_MSG_PROPERTY_KEY} property in C2D message '{cloudToDeviceMsg.MessageId}'", LogLevel.Error);
+                // if the c2d doesn't have a mac command, it needs a fport
+                // if it has a Mac command and the message payload is more than 0, it needs a fport as well.
+                if (!containMacCommand || (cloudToDeviceMsg.GetBytes().Length > 0 && containMacCommand))
                     return false;
-                }
-
-                if (byte.TryParse(fportValue, out var fport))
-                {
-                    // ensure fport follows LoRa specification
-                    // 0    => reserved for mac commands
-                    // 224+ => reserved for future applications
-                    if (fport != Constants.LORA_FPORT_RESERVED_MAC_MSG && fport < Constants.LORA_FPORT_RESERVED_FUTURE_START)
-                        return true;
-                }
-
-                Logger.Log(loRaDevice.DevEUI, $"invalid fport '{fportValue}' in C2D message '{cloudToDeviceMsg.MessageId}'", LogLevel.Error);
             }
+
+            if (byte.TryParse(fportValue, out var fport))
+            {
+                // ensure fport follows LoRa specification
+                // 0    => reserved for mac commands
+                // 224+ => reserved for future applications
+                if (fport != Constants.LORA_FPORT_RESERVED_MAC_MSG && fport < Constants.LORA_FPORT_RESERVED_FUTURE_START)
+                    return true;
+            }
+
+            Logger.Log(loRaDevice.DevEUI, $"invalid fport '{fportValue}' in C2D message '{cloudToDeviceMsg.MessageId}'", LogLevel.Error);
 
             return containMacCommand;
         }
@@ -559,7 +559,7 @@ namespace LoRaWan.NetworkServer
                 {
                     try
                     {
-                        var macCmd = MacCommand.CreateMacCommandFromC2DMessage(cidTypeValue, cloudToDeviceMessage.Properties);
+                        var macCmd = MacCommand.CreateMacCommandFromC2DMessage(devEUI, cidTypeValue, cloudToDeviceMessage.Properties);
                         if (!macCommands.TryAdd((int)macCmd.Cid, macCmd))
                         {
                             Logger.Log(devEUI, $"Could not send the C2D Mac Command {cidTypeValue}, as such a property was already present in the message. Please resend the C2D", LogLevel.Error);
