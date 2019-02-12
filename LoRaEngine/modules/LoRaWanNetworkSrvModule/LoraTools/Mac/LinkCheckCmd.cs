@@ -10,9 +10,9 @@ namespace LoRaTools
     /// </summary>
     public class LinkCheckCmd : GenericMACCommand
     {
-        uint Margin { get; set; }
+        public uint Margin { get; set; }
 
-        uint GwCnt { get; set; }
+        public uint GwCnt { get; set; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="LinkCheckCmd"/> class.

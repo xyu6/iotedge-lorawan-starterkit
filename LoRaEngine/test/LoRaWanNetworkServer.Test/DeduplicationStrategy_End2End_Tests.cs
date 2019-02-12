@@ -138,5 +138,46 @@ namespace LoRaWan.NetworkServer.Test
                     break;
             }
         }
+
+        [Fact]
+        public async Task When_ConfirmedUp_Where_Deduplication_Has_NoFcntDown_Should_Abandon_Message()
+        {
+            const int PayloadFcnt = 10;
+            const int InitialDeviceFcntUp = 9;
+            const int InitialDeviceFcntDown = 20;
+
+            var simDevice = new SimulatedDevice(
+                TestDeviceInfo.CreateABPDevice(1, gatewayID: null),
+                frmCntUp: InitialDeviceFcntUp,
+                frmCntDown: InitialDeviceFcntDown);
+
+            this.LoRaDeviceApi.Setup(x => x.CheckDuplicateMsgAsync(simDevice.DevEUI, PayloadFcnt, this.ServerConfiguration.GatewayID, InitialDeviceFcntDown))
+                .ReturnsAsync(new DeduplicationResult
+                {
+                    CanProcess = true,
+                    GatewayId = "another-gateway",
+                    IsDuplicate = true,
+                });
+
+            var loRaDevice = this.CreateLoRaDevice(simDevice);
+            loRaDevice.Deduplication = DeduplicationMode.Mark;
+
+            var deviceRegistry = new LoRaDeviceRegistry(this.ServerConfiguration, this.NewNonEmptyCache(loRaDevice), this.LoRaDeviceApi.Object, this.LoRaDeviceFactory);
+
+            var messageDispatcher = new MessageDispatcher(
+                this.ServerConfiguration,
+                deviceRegistry,
+                this.FrameCounterUpdateStrategyProvider);
+
+            var requestRxpk = simDevice.CreateConfirmedMessageUplink("1", fcnt: PayloadFcnt).Rxpk[0];
+            var request = this.CreateWaitableRequest(requestRxpk);
+            messageDispatcher.DispatchRequest(request);
+            Assert.True(await request.WaitCompleteAsync());
+            Assert.True(request.ProcessingFailed);
+            Assert.Equal(LoRaDeviceRequestFailedReason.HandledByAnotherGateway, request.ProcessingFailedReason);
+
+            this.LoRaDeviceApi.VerifyAll();
+            this.LoRaDeviceClient.VerifyAll();
+        }
     }
 }

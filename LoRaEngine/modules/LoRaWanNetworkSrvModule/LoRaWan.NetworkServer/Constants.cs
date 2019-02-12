@@ -5,9 +5,6 @@ namespace LoRaWan.NetworkServer
 {
     public static class Constants
     {
-        // Defines Cloud to device message property containing fport value
-        internal const string FPORT_MSG_PROPERTY_KEY = "fport";
-
         // Fport value reserved for mac commands
         internal const byte LORA_FPORT_RESERVED_MAC_MSG = 0;
 
@@ -28,5 +25,10 @@ namespace LoRaWan.NetworkServer
 
         // Invalid receive window (when trying to resolve the window to use)
         public const int INVALID_RECEIVE_WINDOW = 0;
+
+        /// <summary>
+        /// Defines the maximum difference between saved frame counts before we require a change
+        /// </summary>
+        public const int MAX_FCNT_UNSAVED_DELTA = 10;
     }
 }

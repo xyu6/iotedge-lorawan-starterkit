@@ -18,6 +18,10 @@ namespace LoRaTools
 
         private readonly uint minDR;
 
+        public NewChannelReq()
+        {
+        }
+
         public NewChannelReq(uint chIndex, uint freq, uint maxDr, uint minDr)
         {
             this.Length = 4;

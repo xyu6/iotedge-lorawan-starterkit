@@ -1,9 +1,9 @@
 
 #include <LoRaWan.h>
 //set to true to send confirmed data up messages
-bool confirmed=true;
+bool confirmed=false;
 //application information, should be similar to what was provisiionned in the device twins
-char * deviceId ="47AAC86800430028";
+char * deviceId ="FBEAA00000000001";
 char * appKey="8AFE71A145B253E49C3031AD068277A1";
 char* appEui ="BE7A0000000014E2";
 

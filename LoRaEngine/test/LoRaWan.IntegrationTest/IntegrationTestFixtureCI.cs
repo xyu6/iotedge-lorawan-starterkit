@@ -74,6 +74,9 @@ namespace LoRaWan.IntegrationTest
         // Device21_ABP: Preferred 2nd window
         public TestDeviceInfo Device21_ABP { get; private set; }
 
+        // Device22_ABP: Class C device
+        public TestDeviceInfo Device22_ABP { get; private set; }
+
         // Arduino device used for testing
         public LoRaArduinoSerial ArduinoDevice
         {
@@ -352,6 +355,19 @@ namespace LoRaWan.IntegrationTest
                 NwkSKey = "00000000000000000000000000000021",
                 DevAddr = "00000021",
                 PreferredWindow = 2,
+            };
+
+            // Device22_ABP: Class C device test
+            this.Device22_ABP = new TestDeviceInfo()
+            {
+                DeviceID = "0000000000000022",
+                GatewayID = gatewayID,
+                IsIoTHubDevice = true,
+                SensorDecoder = "DecoderValueSensor",
+                AppSKey = "00000000000000000000000000000022",
+                NwkSKey = "00000000000000000000000000000022",
+                DevAddr = "00000022",
+                ClassType = 'C',
             };
         }
     }

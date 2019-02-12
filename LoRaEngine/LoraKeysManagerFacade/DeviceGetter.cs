@@ -23,13 +23,89 @@ namespace LoraKeysManagerFacade
 
         static RegistryManager registryManager;
 
-        public class IoTHubDeviceInfo
+        static object deviceGetterInitLock = new object();
+
+        static void EnsureInitialized(ExecutionContext context)
         {
-            public string DevAddr { get; set; }
+            if (redisCache == null || registryManager == null)
+            {
+                lock (deviceGetterInitLock)
+                {
+                    if (redisCache == null || registryManager == null)
+                    {
+                        var config = new ConfigurationBuilder()
+                          .SetBasePath(context.FunctionAppDirectory)
+                          .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
+                          .AddEnvironmentVariables()
+                          .Build();
+                        string connectionString = config.GetConnectionString("IoTHubConnectionString");
 
-            public string DevEUI { get; set; }
+                        if (connectionString == null)
+                        {
+                            string errorMsg = "Missing IoTHubConnectionString in settings";
+                            throw new Exception(errorMsg);
+                        }
 
-            public string PrimaryKey { get; set; }
+                        string redisConnectionString = config.GetConnectionString("RedisConnectionString");
+                        if (redisConnectionString == null)
+                        {
+                            string errorMsg = "Missing RedisConnectionString in settings";
+                            throw new Exception(errorMsg);
+                        }
+
+                        registryManager = RegistryManager.CreateFromConnectionString(connectionString);
+
+                        var redis = ConnectionMultiplexer.Connect(redisConnectionString);
+                        redisCache = redis.GetDatabase();
+                    }
+                }
+            }
+        }
+
+        [FunctionName(nameof(GetDeviceByDevEUI))]
+        public static async Task<IActionResult> GetDeviceByDevEUI([HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)]HttpRequest req, ILogger log, ExecutionContext context)
+        {
+            return await RunGetDeviceByDevEUI(req, log, context, ApiVersion.LatestVersion);
+        }
+
+        private static async Task<IActionResult> RunGetDeviceByDevEUI(HttpRequest req, ILogger log, ExecutionContext context, ApiVersion currentApiVersion)
+        {
+            // Set the current version in the response header
+            req.HttpContext.Response.Headers.Add(ApiVersion.HttpHeaderName, currentApiVersion.Version);
+
+            var requestedVersion = req.GetRequestedVersion();
+            if (requestedVersion == null || !currentApiVersion.SupportsVersion(requestedVersion))
+            {
+                return new BadRequestObjectResult($"Incompatible versions (requested: '{requestedVersion.Name ?? string.Empty}', current: '{currentApiVersion.Name}')");
+            }
+
+            string devEUI = req.Query["DevEUI"];
+            if (string.IsNullOrEmpty(devEUI))
+            {
+                return new BadRequestResult();
+            }
+
+            EnsureInitialized(context);
+
+            var result = new List<IoTHubDeviceInfo>();
+            var device = await registryManager.GetDeviceAsync(devEUI);
+            if (device != null)
+            {
+                if (device != null)
+                {
+                    result.Add(new IoTHubDeviceInfo()
+                    {
+                        DevEUI = devEUI,
+                        PrimaryKey = device.Authentication.SymmetricKey.PrimaryKey
+                    });
+                }
+
+                return new OkObjectResult(result);
+            }
+            else
+            {
+                return new NotFoundObjectResult(result);
+            }
         }
 
         /// <summary>
@@ -61,39 +137,7 @@ namespace LoraKeysManagerFacade
 
             string gatewayId = req.Query["GatewayId"];
 
-            if (redisCache == null || registryManager == null)
-            {
-                lock (typeof(FCntCacheCheck))
-                {
-                    if (redisCache == null || registryManager == null)
-                    {
-                        var config = new ConfigurationBuilder()
-                          .SetBasePath(context.FunctionAppDirectory)
-                          .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
-                          .AddEnvironmentVariables()
-                          .Build();
-                        string connectionString = config.GetConnectionString("IoTHubConnectionString");
-
-                        if (connectionString == null)
-                        {
-                            string errorMsg = "Missing IoTHubConnectionString in settings";
-                            throw new Exception(errorMsg);
-                        }
-
-                        string redisConnectionString = config.GetConnectionString("RedisConnectionString");
-                        if (redisConnectionString == null)
-                        {
-                            string errorMsg = "Missing RedisConnectionString in settings";
-                            throw new Exception(errorMsg);
-                        }
-
-                        registryManager = RegistryManager.CreateFromConnectionString(connectionString);
-
-                        var redis = ConnectionMultiplexer.Connect(redisConnectionString);
-                        redisCache = redis.GetDatabase();
-                    }
-                }
-            }
+            EnsureInitialized(context);
 
             List<IoTHubDeviceInfo> results = new List<IoTHubDeviceInfo>();
 

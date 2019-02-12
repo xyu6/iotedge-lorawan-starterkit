@@ -3,6 +3,9 @@
 
 namespace LoRaTools
 {
+    using Newtonsoft.Json;
+
+    [JsonConverter(typeof(MACCommandJsonConverter))]
     public abstract class GenericMACCommand
     {
         /// <summary>

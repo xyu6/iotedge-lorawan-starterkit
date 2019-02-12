@@ -822,6 +822,16 @@ namespace LoRaWan.IntegrationTest
             return this;
         }
 
+        public async Task setClassTypeAsync(_class_type_t type)
+        {
+            if (type == _class_type_t.CLASS_A)
+                this.sendCommand("AT+CLASS=A\r\n");
+            else if (type == _class_type_t.CLASS_C)
+                this.sendCommand("AT+CLASS=C\r\n");
+
+            await Task.Delay(DEFAULT_TIMEWAIT);
+        }
+
         public LoRaArduinoSerial setDeciveMode(_device_mode_t mode)
         {
             if (mode == _device_mode_t.LWABP)
@@ -933,6 +943,13 @@ namespace LoRaWan.IntegrationTest
             Thread.Sleep(DEFAULT_TIMEWAIT);
 
             return this;
+        }
+
+        public async Task setDeviceResetAsync()
+        {
+            this.sendCommand("AT+RESET\r\n");
+
+            await Task.Delay(DEFAULT_TIMEWAIT);
         }
 
         public void setDeviceDefault()

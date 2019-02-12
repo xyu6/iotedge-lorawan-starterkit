@@ -86,7 +86,7 @@ namespace LoRaWan.NetworkServer.Test
             {
                 Content = new StringContent("100"),
             };
-            this.fakeHttpResponseMessage.Headers.Add(ApiVersion.HttpHeaderName, ApiVersion.Version_2019_01_30_Preview.Version);
+            this.fakeHttpResponseMessage.Headers.Add(ApiVersion.HttpHeaderName, ApiVersion.Version_2019_02_12_Preview.Version);
 
             var httpClient = new HttpClient(target);
             var response = await httpClient.GetAsync("https://mytest.test.com/api/Function1?code=aaabbbb");
@@ -117,7 +117,7 @@ namespace LoRaWan.NetworkServer.Test
         [Fact]
         public async Task When_Function_Returns_Known_Older_Version_Should_Return_Bad_Request()
         {
-            var target = new ServiceFacadeHttpClientHandler(ApiVersion.Version_2019_01_30_Preview, this.FakeHandler);
+            var target = new ServiceFacadeHttpClientHandler(ApiVersion.Version_2019_02_12_Preview, this.FakeHandler);
             this.fakeHttpResponseMessage = new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent("100"),
@@ -128,14 +128,14 @@ namespace LoRaWan.NetworkServer.Test
             var response = await httpClient.GetAsync("https://mytest.test.com/api/Function1?code=aaabbbb");
             Assert.False(response.IsSuccessStatusCode);
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-            Assert.Equal("Version mismatch (expected: 2019-01-30-preview, function version: 2018-12-16-preview), ensure you have the latest version deployed", response.ReasonPhrase);
-            Assert.Equal("https://mytest.test.com/api/Function1?code=aaabbbb&api-version=2019-01-30-preview", this.fakeRequestedUri.ToString());
+            Assert.Equal("Version mismatch (expected: 2019-02-12-preview, function version: 2018-12-16-preview), ensure you have the latest version deployed", response.ReasonPhrase);
+            Assert.Equal("https://mytest.test.com/api/Function1?code=aaabbbb&api-version=2019-02-12-preview", this.fakeRequestedUri.ToString());
         }
 
         [Fact]
         public async Task When_Function_Returns_Unknown_Older_Version_Should_Return_Bad_Request()
         {
-            var target = new ServiceFacadeHttpClientHandler(ApiVersion.Version_2019_01_30_Preview, this.FakeHandler);
+            var target = new ServiceFacadeHttpClientHandler(ApiVersion.Version_2019_02_12_Preview, this.FakeHandler);
             this.fakeHttpResponseMessage = new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent("100"),
@@ -146,14 +146,14 @@ namespace LoRaWan.NetworkServer.Test
             var response = await httpClient.GetAsync("https://mytest.test.com/api/Function1?code=aaabbbb");
             Assert.False(response.IsSuccessStatusCode);
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-            Assert.Equal("Version mismatch (expected: 2019-01-30-preview, function version: 2018-01-01-preview), ensure you have the latest version deployed", response.ReasonPhrase);
-            Assert.Equal("https://mytest.test.com/api/Function1?code=aaabbbb&api-version=2019-01-30-preview", this.fakeRequestedUri.ToString());
+            Assert.Equal("Version mismatch (expected: 2019-02-12-preview, function version: 2018-01-01-preview), ensure you have the latest version deployed", response.ReasonPhrase);
+            Assert.Equal("https://mytest.test.com/api/Function1?code=aaabbbb&api-version=2019-02-12-preview", this.fakeRequestedUri.ToString());
         }
 
         [Fact]
         public async Task When_Function_Returns_Error_Does_Not_Check_Version_Compatibility()
         {
-            var target = new ServiceFacadeHttpClientHandler(ApiVersion.Version_2019_01_30_Preview, this.FakeHandler);
+            var target = new ServiceFacadeHttpClientHandler(ApiVersion.Version_2019_02_12_Preview, this.FakeHandler);
             this.fakeHttpResponseMessage = new HttpResponseMessage(HttpStatusCode.InternalServerError)
             {
                 Content = new StringContent("100"),
@@ -166,7 +166,7 @@ namespace LoRaWan.NetworkServer.Test
             Assert.False(response.IsSuccessStatusCode);
             Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
             Assert.Equal("Internal Server Error", response.ReasonPhrase);
-            Assert.Equal("https://mytest.test.com/api/Function1?code=aaabbbb&api-version=2019-01-30-preview", this.fakeRequestedUri.ToString());
+            Assert.Equal("https://mytest.test.com/api/Function1?code=aaabbbb&api-version=2019-02-12-preview", this.fakeRequestedUri.ToString());
         }
     }
 }

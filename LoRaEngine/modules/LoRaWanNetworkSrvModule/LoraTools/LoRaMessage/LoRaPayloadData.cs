@@ -111,8 +111,6 @@ namespace LoRaTools.LoRaMessage
         public LoRaPayloadData(byte[] inputMessage)
             : base(inputMessage)
         {
-            // in this case the payload is not downlink of our type
-            this.Direction = this.Mhdr.Span[0] & (1 << 6 - 1);
             // get the address
             byte[] addrbytes = new byte[4];
             Array.Copy(inputMessage, 1, addrbytes, 0, 4);
@@ -120,6 +118,18 @@ namespace LoRaTools.LoRaMessage
             Array.Reverse(addrbytes);
             this.DevAddr = addrbytes;
             this.LoRaMessageType = (LoRaMessageType)this.RawMessage[0];
+
+            // in this case the payload is not downlink of our type
+            if (this.LoRaMessageType == LoRaMessageType.ConfirmedDataDown ||
+                this.LoRaMessageType == LoRaMessageType.JoinAccept ||
+                this.LoRaMessageType == LoRaMessageType.UnconfirmedDataDown)
+            {
+                this.Direction = 1;
+            }
+            else
+            {
+                this.Direction = 0;
+            }
 
             this.Mhdr = new Memory<byte>(this.RawMessage, 0, 1);
             // Fctrl Frame Control Octet
