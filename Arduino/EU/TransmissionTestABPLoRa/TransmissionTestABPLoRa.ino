@@ -55,14 +55,14 @@ void setup(void)
   lora.setJoinDutyCycle(false);
 
 
-  lora.setPower(1);
+  lora.setPower(14);
 
 
 }
 
 void loop(void)
 {
-  if ((millis() - lastCall) > 20000) {
+  if ((millis() - lastCall) > 5000) {
     lastCall = millis();
     bool result = false;
     String packetString = "";

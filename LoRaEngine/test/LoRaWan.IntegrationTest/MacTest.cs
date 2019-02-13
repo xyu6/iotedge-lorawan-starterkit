@@ -25,7 +25,7 @@ namespace LoRaWan.IntegrationTest
         // Send a LinkCheckCmd from the device and expect an answer.
         // Use Device22_ABP
         [Fact]
-        public async Task Test_Mac_LinkCheckCmd_Should_work()
+        public async Task Test_Device_Initiated_Mac_LinkCheckCmd_Should_work()
         {
             const int MESSAGES_COUNT = 3;
 
@@ -51,23 +51,21 @@ namespace LoRaWan.IntegrationTest
 
                 await this.TestFixtureCi.AssertNetworkServerModuleLogStartsWithAsync($"{device.DeviceID}: valid frame counter, msg:");
 
-                await this.TestFixtureCi.AssertNetworkServerModuleLogStartsWithAsync($"{device.DevAddr}: LinkCheckCmd mac command detected in upstream payload:");
+                await this.TestFixtureCi.AssertNetworkServerModuleLogStartsWithAsync($"{device.DeviceID}: LinkCheckCmd mac command detected in upstream payload:");
             }
 
             await this.TestFixtureCi.AssertNetworkServerModuleLogStartsWithAsync($"{device.DeviceID}: Answering to a");
-
-            await AssertUtils.ContainsWithRetriesAsync("MSGHEX: RXWIN", this.ArduinoDevice.SerialLogs);
 
             this.TestFixtureCi.ClearLogs();
             await this.ArduinoDevice.setPortAsync(1);
         }
 
-        // Ensures that C2D messages are received when working with unconfirmed messages
+        // Ensures that Mac Commands C2D messages working
         // Uses Device23_OTAA
         [Theory]
         [InlineData("")]
         [InlineData("test")]
-        public async Task Test_OTAA_Unconfirmed_Receives_C2D_Message(string c2dMessageBody)
+        public async Task Test_OTAA_Unconfirmed_Send_And_Receive_C2D_Mac_Commands(string c2dMessageBody)
         {
             var device = this.TestFixtureCi.Device10_OTAA;
             this.LogTestStart(device);
@@ -116,7 +114,6 @@ namespace LoRaWan.IntegrationTest
                 await AssertUtils.ContainsWithRetriesAsync("+MSG: Done", this.ArduinoDevice.SerialLogs);
 
                 // check if c2d message was found
-                // 0000000000000009: C2D message: 58
                 var c2dLogMessage = $"{device.DeviceID}: Cloud to device MAC command DevStatusCmd received";
                 var searchResults = await this.TestFixtureCi.SearchNetworkServerModuleAsync(
                     (messageBody) =>

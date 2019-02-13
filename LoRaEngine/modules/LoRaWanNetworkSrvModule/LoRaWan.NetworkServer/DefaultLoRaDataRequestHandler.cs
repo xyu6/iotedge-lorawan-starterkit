@@ -326,6 +326,7 @@ namespace LoRaWan.NetworkServer
                 if (!Enum.TryParse(macCommand, out CidEnum cid))
                 {
                     Logger.Log(loRaDevice.DevEUI, $"CidEnum type of C2D mac Command {macCommand} could not be parsed", LogLevel.Error);
+                    return false;
                 }
                 else
                 {
@@ -333,14 +334,18 @@ namespace LoRaWan.NetworkServer
                 }
             }
 
+            // if you have a body you need a fport
+
             // ensure fport property has been set
             if (!cloudToDeviceMsg.Properties.TryGetValueCaseInsensitive(Constants.FPORT_MSG_PROPERTY_KEY, out var fportValue))
             {
-                Logger.Log(loRaDevice.DevEUI, $"missing {Constants.FPORT_MSG_PROPERTY_KEY} property in C2D message '{cloudToDeviceMsg.MessageId}'", LogLevel.Error);
                 // if the c2d doesn't have a mac command, it needs a fport
                 // if it has a Mac command and the message payload is more than 0, it needs a fport as well.
-                if (!containMacCommand || (cloudToDeviceMsg.GetBytes().Length > 0 && containMacCommand))
+                if (!containMacCommand || (cloudToDeviceMsg.GetBytes().Length > 0))
+                {
+                    Logger.Log(loRaDevice.DevEUI, $"missing {Constants.FPORT_MSG_PROPERTY_KEY} property in C2D message '{cloudToDeviceMsg.MessageId}'", LogLevel.Error);
                     return false;
+                }
             }
 
             if (byte.TryParse(fportValue, out var fport))
@@ -348,7 +353,11 @@ namespace LoRaWan.NetworkServer
                 // ensure fport follows LoRa specification
                 // 0    => reserved for mac commands
                 // 224+ => reserved for future applications
-                if (fport == Constants.LORA_FPORT_RESERVED_MAC_MSG && fport >= Constants.LORA_FPORT_RESERVED_FUTURE_START)
+                if (fport != Constants.LORA_FPORT_RESERVED_MAC_MSG && fport < Constants.LORA_FPORT_RESERVED_FUTURE_START)
+                {
+                    return true;
+                }
+                else
                 {
                     Logger.Log(loRaDevice.DevEUI, $"invalid fport '{fportValue}' in C2D message '{cloudToDeviceMsg.MessageId}'", LogLevel.Error);
                     return false;
@@ -408,7 +417,7 @@ namespace LoRaWan.NetworkServer
 
                 frmPayload = cloudToDeviceMessage?.GetBytes();
 
-                Logger.Log(loRaDevice.DevEUI, $"C2D message: {Encoding.UTF8.GetString(frmPayload)}, id: {cloudToDeviceMessage.MessageId ?? "undefined"}, fport: {fport ?? 0}, confirmed: {requiresDeviceAcknowlegement}, macCommand: {(macCommands.Count > 0 ? true : false)}", LogLevel.Information);
+                Logger.Log(loRaDevice.DevEUI, $"C2D message: {(frmPayload.Length == 0 ? "empty" : Encoding.UTF8.GetString(frmPayload))}, id: {cloudToDeviceMessage.MessageId ?? "undefined"}, fport: {fport ?? 0}, confirmed: {requiresDeviceAcknowlegement}, macCommand: {(macCommands.Count > 0 ? true : false)}", LogLevel.Information);
                 // cut to the max payload of lora for any EU datarate
                 if (frmPayload.Length > 51)
                     Array.Resize(ref frmPayload, 51);

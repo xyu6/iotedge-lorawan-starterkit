@@ -741,6 +741,9 @@ namespace LoRaWan.NetworkServer.Test
                 Assert.Single(payloadDataDown.Fopts.Span.ToArray());
                 Assert.Equal((byte)LoRaTools.CidEnum.DevStatusCmd, payloadDataDown.Fopts.Span[0]);
             }
+
+            this.LoRaDeviceClient.VerifyAll();
+            this.LoRaDeviceApi.VerifyAll();
         }
 
         [Theory]

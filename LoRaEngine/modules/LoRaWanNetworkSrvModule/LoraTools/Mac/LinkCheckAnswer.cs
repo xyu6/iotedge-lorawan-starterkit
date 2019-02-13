@@ -11,9 +11,9 @@ namespace LoRaTools
     /// </summary>
     public class LinkCheckAnswer : MacCommand
     {
-        uint Margin { get; set; }
+        public uint Margin { get; set; }
 
-        uint GwCnt { get; set; }
+        public uint GwCnt { get; set; }
 
         public override int Length => 1;
 
@@ -26,6 +26,17 @@ namespace LoRaTools
             this.Margin = margin;
             this.GwCnt = gwCnt;
             this.Cid = CidEnum.LinkCheckCmd;
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="LinkCheckAnswer"/> class.
+        /// Test Constructor
+        /// </summary>
+        public LinkCheckAnswer(Span<byte> input)
+        {
+            this.Cid = (CidEnum)input[0];
+            this.Margin = (uint)input[1];
+            this.GwCnt = (uint)input[2];
         }
 
         public override IEnumerable<byte> ToBytes()
