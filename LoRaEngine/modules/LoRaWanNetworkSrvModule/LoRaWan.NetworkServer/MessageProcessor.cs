@@ -260,7 +260,7 @@ namespace LoRaWan.NetworkServer
                                 try
                                 {
                                     // In case of a Mac command only payload
-                                    if (loraPayload.GetFPort() == LORA_FPORT_RESERVED_MAC_MSG)
+                                    if (loraPayload.FPort== LORA_FPORT_RESERVED_MAC_MSG)
                                     {
                                         loraPayload.MacCommands = MacCommand.CreateMacCommandFromBytes(loRaDevice.DevEUI, loraPayload.GetDecryptedPayload(loRaDevice.NwkSKey));
                                         requiresConfirmation = loraPayload.IsConfirmed() || loraPayload.IsMacAnswerRequired();
@@ -275,7 +275,7 @@ namespace LoRaWan.NetworkServer
                                     Logger.Log(loRaDevice.DevEUI, $"failed to decrypt message: {ex.Message}", LogLevel.Error);
                                 }
 
-                                var fportUp = loraPayload.GetFPort();
+                                var fportUp = loraPayload.FPort;
 
                                 // If contains a command only payload
                                 if (decryptedPayloadData != null)
@@ -293,7 +293,7 @@ namespace LoRaWan.NetworkServer
                                 }
                             }
 
-                            if (loraPayload.GetFPort() != LORA_FPORT_RESERVED_MAC_MSG)
+                            if (loraPayload.FPort!= LORA_FPORT_RESERVED_MAC_MSG)
                             {
                                 if (!await this.SendDeviceEventAsync(loRaDevice, rxpk, payloadData, loraPayload, timeWatcher))
                                 {
