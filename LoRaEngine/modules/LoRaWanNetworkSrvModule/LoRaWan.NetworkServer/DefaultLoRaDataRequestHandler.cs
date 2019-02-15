@@ -41,7 +41,7 @@ namespace LoRaWan.NetworkServer
             var loraPayload = (LoRaPayloadData)request.Payload;
 
             var payloadFcnt = loraPayload.GetFcnt();
-            var requiresConfirmation = loraPayload.IsConfirmed();
+            var requiresConfirmation = loraPayload.IsConfirmed() || loraPayload.IsMacAnswerRequired();
 
             DeduplicationResult deduplicationResult = null;
 
@@ -55,8 +55,8 @@ namespace LoRaWan.NetworkServer
                     // if we require a confirmation we can calculate the next frame counter down
                     // using the same roundtrip as resolving deduplication, passing it along in that
                     // case. The API will then send down the next frame counter down with the result
-                    int? fcntDown = requiresConfirmation ? loRaDevice.FCntDown : (int?)null;
-                    deduplicationResult = await deduplicationStrategy.ResolveDeduplication(payloadFcnt, fcntDown, this.configuration.GatewayID);
+                    int? currentDeviceFcntDown = requiresConfirmation ? loRaDevice.FCntDown : (int?)null;
+                    deduplicationResult = await deduplicationStrategy.ResolveDeduplication(payloadFcnt, currentDeviceFcntDown, this.configuration.GatewayID);
                     if (!deduplicationResult.CanProcess)
                     {
                         // duplication strategy is indicating that we do not need to continue processing this message
@@ -72,9 +72,6 @@ namespace LoRaWan.NetworkServer
                 Logger.Log(loRaDevice.DevEUI, $"failed to resolve frame count update strategy, device gateway: {loRaDevice.GatewayID}, message ignored", LogLevel.Error);
                 return new LoRaDeviceRequestProcessResult(loRaDevice, request, LoRaDeviceRequestFailedReason.ApplicationError);
             }
-
-            var payloadFcnt = loraPayload.GetFcnt();
-            var requiresConfirmation = loraPayload.IsConfirmed() || loraPayload.IsMacAnswerRequired();
 
             using (new LoRaDeviceFrameCounterSession(loRaDevice, frameCounterStrategy))
             {
@@ -169,7 +166,27 @@ namespace LoRaWan.NetworkServer
                                 if (fportUp == Constants.LORA_FPORT_RESERVED_MAC_MSG)
                                 {
                                     loraPayload.MacCommands = MacCommand.CreateMacCommandFromBytes(loRaDevice.DevEUI, loraPayload.GetDecryptedPayload(loRaDevice.NwkSKey));
-                                    requiresConfirmation = loraPayload.IsConfirmed() || loraPayload.IsMacAnswerRequired();
+                                    if (loraPayload.IsMacAnswerRequired())
+                                    {
+                                        if (!requiresConfirmation)
+                                        {
+                                            fcntDown = await frameCounterStrategy.NextFcntDown(loRaDevice, payloadFcnt);
+
+                                            // Failed to update the fcnt down
+                                            // In multi gateway scenarios it means the another gateway was faster than using, can stop now
+                                            if (fcntDown <= 0)
+                                            {
+                                                // update our fcntup anyway?
+                                                // loRaDevice.SetFcntUp(payloadFcnt);
+                                                Logger.Log(loRaDevice.DevEUI, "another gateway has already sent ack or downlink msg", LogLevel.Information);
+
+                                                return new LoRaDeviceRequestProcessResult(loRaDevice, request, LoRaDeviceRequestFailedReason.HandledByAnotherGateway);
+                                            }
+
+                                            Logger.Log(loRaDevice.DevEUI, $"down frame counter: {loRaDevice.FCntDown}", LogLevel.Information);
+                                            requiresConfirmation = true;
+                                        }
+                                    }
                                 }
                                 else
                                 {
@@ -199,7 +216,7 @@ namespace LoRaWan.NetworkServer
                         // In case it is a Mac Command only we don't want to send it to the IoT Hub
                         if (fportUp != Constants.LORA_FPORT_RESERVED_MAC_MSG)
                         {
-                            if (!await this.SendDeviceEventAsync(request, loRaDevice, timeWatcher, payloadData))
+                            if (!await this.SendDeviceEventAsync(request, loRaDevice, timeWatcher, payloadData, deduplicationResult))
                             {
                                 // failed to send event to IoT Hub, stop now
                                 return new LoRaDeviceRequestProcessResult(loRaDevice, request, LoRaDeviceRequestFailedReason.IoTHubProblem);
@@ -355,7 +372,7 @@ namespace LoRaWan.NetworkServer
             // If a C2D message contains a Mac command we don't need to set the fport.
             if (cloudToDeviceMsg.Properties.TryGetValueCaseInsensitive(Constants.C2D_MSG_PROPERTY_MAC_COMMAND, out var macCommand))
             {
-                if (!Enum.TryParse(macCommand, out CidEnum _))
+                if (!Enum.TryParse(macCommand, out LoRaTools.CidEnum _))
                 {
                     Logger.Log(loRaDevice.DevEUI, $"CidEnum type of C2D mac Command {macCommand} could not be parsed", LogLevel.Error);
                     return false;

@@ -170,7 +170,10 @@ namespace LoRaWan.NetworkServer
                 }
 
                 var frameCounterStrategy = this.frameCounterUpdateStrategyProvider.GetStrategy(loRaDevice.GatewayID);
+<<<<<<< HEAD
 
+=======
+>>>>>>> merge with dev
 
                 using (new LoRaDeviceFrameCounterSession(loRaDevice, frameCounterStrategy))
                 {
@@ -260,7 +263,7 @@ namespace LoRaWan.NetworkServer
                                 try
                                 {
                                     // In case of a Mac command only payload
-                                    if (loraPayload.FPort== LORA_FPORT_RESERVED_MAC_MSG)
+                                    if (loraPayload.FPort == LORA_FPORT_RESERVED_MAC_MSG)
                                     {
                                         loraPayload.MacCommands = MacCommand.CreateMacCommandFromBytes(loRaDevice.DevEUI, loraPayload.GetDecryptedPayload(loRaDevice.NwkSKey));
                                         requiresConfirmation = loraPayload.IsConfirmed() || loraPayload.IsMacAnswerRequired();
@@ -293,13 +296,10 @@ namespace LoRaWan.NetworkServer
                                 }
                             }
 
-                            if (loraPayload.FPort!= LORA_FPORT_RESERVED_MAC_MSG)
+                            if (!await this.SendDeviceEventAsync(loRaDevice, rxpk, payloadData, loraPayload, timeWatcher, deduplicationResult))
                             {
-                                if (!await this.SendDeviceEventAsync(loRaDevice, rxpk, payloadData, loraPayload, timeWatcher))
-                                {
-                                    // failed to send event to IoT Hub, stop now
-                                    return null;
-                                }
+                                // failed to send event to IoT Hub, stop now
+                                return null;
                             }
 
                             loRaDevice.SetFcntUp(payloadFcnt);
@@ -836,7 +836,7 @@ namespace LoRaWan.NetworkServer
         /// </summary>
         public void ProcessAndSendMacCommands(LoRaPayloadData payloadData, ref Dictionary<string, string> eventProperties)
         {
-            var macCommands = payloadData.GetMacCommands();
+            var macCommands = payloadData.MacCommands;
             if (macCommands?.Count > 0)
             {
                 eventProperties = eventProperties ?? new Dictionary<string, string>();
