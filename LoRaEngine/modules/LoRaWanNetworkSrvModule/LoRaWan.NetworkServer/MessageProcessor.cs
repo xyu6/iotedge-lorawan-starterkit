@@ -170,11 +170,6 @@ namespace LoRaWan.NetworkServer
                 }
 
                 var frameCounterStrategy = this.frameCounterUpdateStrategyProvider.GetStrategy(loRaDevice.GatewayID);
-<<<<<<< HEAD
-
-=======
->>>>>>> merge with dev
-
                 using (new LoRaDeviceFrameCounterSession(loRaDevice, frameCounterStrategy))
                 {
                     // Leaf devices that restart lose the counter. In relax mode we accept the incoming frame counter

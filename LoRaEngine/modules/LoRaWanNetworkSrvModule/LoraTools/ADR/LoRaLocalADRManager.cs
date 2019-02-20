@@ -7,7 +7,7 @@ namespace LoRaTools.ADR
     using System.Threading.Tasks;
     using LoRaWan;
 
-    internal class LoRaLocalADRManager : ILoRaADRManager
+    public class LoRaLocalADRManager : ILoRaADRManager
     {
         private readonly ILoRaADRStore store;
         private readonly ILoRaADRStrategyProvider strategyProvider;
