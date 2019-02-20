@@ -170,10 +170,6 @@ namespace LoRaWan.NetworkServer
                 }
 
                 var frameCounterStrategy = this.frameCounterUpdateStrategyProvider.GetStrategy(loRaDevice.GatewayID);
-<<<<<<< HEAD
-
-=======
->>>>>>> merge with dev
 
                 using (new LoRaDeviceFrameCounterSession(loRaDevice, frameCounterStrategy))
                 {
