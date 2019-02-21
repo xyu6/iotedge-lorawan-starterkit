@@ -10,5 +10,9 @@ namespace LoRaTools.ADR
         public int TxPower { get; set; }
 
         public int DataRate { get; set; }
+
+        public bool CanConfirmToDevice { get; set; }
+
+        public int FCntDown { get; set; }
     }
 }
