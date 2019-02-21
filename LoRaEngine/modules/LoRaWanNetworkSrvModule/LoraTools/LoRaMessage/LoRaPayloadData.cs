@@ -53,7 +53,7 @@ namespace LoRaTools.LoRaMessage
         /// <summary>
         /// Gets the DevAdd netID
         /// </summary>
-        public byte GetDevAddrNetID() => (byte)(this.DevAddr.Span[0] & 0b11111110);
+        public byte GetDevAddrNetID() => (byte)(this.DevAddrPayload.Span[0] & 0b11111110);
 
         /// <summary>
         /// Gets if the payload is a confirmation (ConfirmedDataDown or ConfirmedDataUp)
@@ -199,9 +199,10 @@ namespace LoRaTools.LoRaMessage
             this.RawMessage[0] = (byte)mhdr;
             this.LoRaMessageType = mhdr;
             // Array.Copy(mhdr, 0, RawMessage, 0, 1);
-            Array.Reverse(devAddr);
-            this.DevAddr = new Memory<byte>(this.RawMessage, 1, 4);
+            this.DevAddrPayload = new Memory<byte>(this.RawMessage, 1, 4);
             Array.Copy(devAddr, 0, this.RawMessage, 1, 4);
+            Array.Reverse(devAddr);
+            this.DevAddr = devAddr;
             if (fOpts != null)
             {
                 fctrl[0] = BitConverter.GetBytes(fctrl[0] + fOpts.Length)[0];
@@ -290,7 +291,7 @@ namespace LoRaTools.LoRaMessage
                 }
                 else
                 {
-                    Logger.Log(ConversionHelper.ByteArrayToString(this.DevAddr.Span.ToArray()), $"{((LoRaMessageType)this.Mhdr.Span[0]).ToString()} {jsonMsg}", LogLevel.Debug);
+                    Logger.Log(ConversionHelper.ByteArrayToString(this.DevAddr), $"{((LoRaMessageType)this.Mhdr.Span[0]).ToString()} {jsonMsg}", LogLevel.Debug);
                 }
             }
 
@@ -311,8 +312,8 @@ namespace LoRaTools.LoRaMessage
             mac.Init(key);
             byte[] block =
             {
-            0x49, 0x00, 0x00, 0x00, 0x00, (byte)this.Direction, this.DevAddr.Span[3], this.DevAddr.Span[2], this.DevAddr.Span[1],
-            this.DevAddr.Span[0], this.Fcnt.Span[0], this.Fcnt.Span[1], 0x00, 0x00, 0x00, (byte)(byteMsg.Length - 4)
+            0x49, 0x00, 0x00, 0x00, 0x00, (byte)this.Direction, this.DevAddrPayload.Span[0], this.DevAddrPayload.Span[1], this.DevAddrPayload.Span[2],
+            this.DevAddrPayload.Span[3], this.Fcnt.Span[0], this.Fcnt.Span[1], 0x00, 0x00, 0x00, (byte)(byteMsg.Length - 4)
             };
             var algoinput = block.Concat(byteMsg.Take(byteMsg.Length - 4)).ToArray();
 
@@ -330,8 +331,8 @@ namespace LoRaTools.LoRaMessage
             mac.Init(key);
             byte[] block =
                 {
-                0x49, 0x00, 0x00, 0x00, 0x00, (byte)this.Direction, this.DevAddr.Span[3], this.DevAddr.Span[2], this.DevAddr.Span[1],
-                this.DevAddr.Span[0], this.Fcnt.Span[0], this.Fcnt.Span[1], 0x00, 0x00, 0x00, (byte)byteMsg.Length
+                0x49, 0x00, 0x00, 0x00, 0x00, (byte)this.Direction, this.DevAddrPayload.Span[0], this.DevAddrPayload.Span[1], this.DevAddrPayload.Span[2],
+                this.DevAddrPayload.Span[3], this.Fcnt.Span[0], this.Fcnt.Span[1], 0x00, 0x00, 0x00, (byte)byteMsg.Length
             };
             var algoinput = block.Concat(byteMsg.Take(byteMsg.Length)).ToArray();
 
@@ -346,7 +347,7 @@ namespace LoRaTools.LoRaMessage
 
         public void ChangeEndianess()
         {
-            this.DevAddr.Span.Reverse();
+            this.DevAddrPayload.Span.Reverse();
         }
 
         /// <summary>
@@ -364,8 +365,8 @@ namespace LoRaTools.LoRaMessage
 
                 byte[] aBlock =
                     {
-                    0x01, 0x00, 0x00, 0x00, 0x00, (byte)this.Direction, this.DevAddr.Span[3], this.DevAddr.Span[2], this.DevAddr.Span[1],
-                    this.DevAddr.Span[0], this.Fcnt.Span[0], this.Fcnt.Span[1], 0x00, 0x00, 0x00, 0x00
+                    0x01, 0x00, 0x00, 0x00, 0x00, (byte)this.Direction, this.DevAddrPayload.Span[0], this.DevAddrPayload.Span[1], this.DevAddrPayload.Span[2],
+                    this.DevAddrPayload.Span[3], this.Fcnt.Span[0], this.Fcnt.Span[1], 0x00, 0x00, 0x00, 0x00
                 };
 
                 byte[] sBlock = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
@@ -428,9 +429,7 @@ namespace LoRaTools.LoRaMessage
         {
             List<byte> messageArray = new List<byte>();
             messageArray.AddRange(this.Mhdr.ToArray());
-            this.DevAddr.Span.Reverse();
-            messageArray.AddRange(this.DevAddr.ToArray());
-            this.DevAddr.Span.Reverse();
+            messageArray.AddRange(this.DevAddrPayload.ToArray());
             messageArray.AddRange(this.Fctrl.ToArray());
             messageArray.AddRange(this.Fcnt.ToArray());
             if (!this.Fopts.Span.IsEmpty)

@@ -264,7 +264,7 @@ namespace LoRaWan.Test.Shared
                 this.LoRaDevice.NwkSKey = BitConverter.ToString(nwkSKey).Replace("-", string.Empty);
                 this.NetId = BitConverter.ToString(netid).Replace("-", string.Empty);
                 this.AppNonce = BitConverter.ToString(appNonce).Replace("-", string.Empty);
-                this.LoRaDevice.DevAddr = BitConverter.ToString(devAddr.ToArray()).Replace("-", string.Empty);
+                this.LoRaDevice.DevAddr = BitConverter.ToString(devAddr).Replace("-", string.Empty);
 
                 return true;
             }

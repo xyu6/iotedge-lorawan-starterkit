@@ -35,9 +35,14 @@ namespace LoRaTools.LoRaMessage
         public Memory<byte> Mic { get; set; }
 
         /// <summary>
+        /// Gets or sets copy of the DevAddr from the payload but reversed to be displayed correctly.
+        /// </summary>
+        public byte[] DevAddr { get; set; }
+
+        /// <summary>
         /// Gets or sets assigned Dev Address, TODO change??
         /// </summary>
-        public Memory<byte> DevAddr { get; set; }
+        public Memory<byte> DevAddrPayload { get; set; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="LoRaPayload"/> class.

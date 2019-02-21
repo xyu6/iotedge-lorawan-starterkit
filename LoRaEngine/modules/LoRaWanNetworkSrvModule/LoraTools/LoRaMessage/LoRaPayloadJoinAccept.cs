@@ -60,7 +60,9 @@ namespace LoRaTools.LoRaMessage
             Array.Copy(appNonce, 0, this.RawMessage, 1, 3);
             this.NetID = new Memory<byte>(this.RawMessage, 4, 3);
             Array.Copy(ConversionHelper.StringToByteArray(netId), 0, this.RawMessage, 4, 3);
-            this.DevAddr = new Memory<byte>(this.RawMessage, 7, 4);
+            this.DevAddrPayload = new Memory<byte>(this.RawMessage, 7, 4);
+            this.DevAddr = this.DevAddrPayload.Span.ToArray();
+            Array.Reverse(this.DevAddr);
             Array.Copy(devAddr, 0, this.RawMessage, 7, 4);
             this.DlSettings = new Memory<byte>(this.RawMessage, 11, 1);
             Array.Copy(dlSettings, 0, this.RawMessage, 11, 1);
@@ -79,7 +81,6 @@ namespace LoRaTools.LoRaMessage
             {
                 this.AppNonce.Span.Reverse();
                 this.NetID.Span.Reverse();
-                this.DevAddr.Span.Reverse();
             }
 
             var algoinput = this.Mhdr.ToArray().Concat(this.AppNonce.ToArray()).Concat(this.NetID.ToArray()).Concat(this.DevAddr.ToArray()).Concat(this.DlSettings.ToArray()).Concat(this.RxDelay.ToArray()).ToArray();
@@ -126,10 +127,12 @@ namespace LoRaTools.LoRaMessage
             Array.Copy(inputMessage, 4, netID, 0, 3);
             Array.Reverse(netID);
             this.NetID = new Memory<byte>(netID);
+
             var devAddr = new byte[4];
             Array.Copy(inputMessage, 7, devAddr, 0, 4);
+            Array.Copy(devAddr, this.DevAddr, 4);
             Array.Reverse(devAddr);
-            this.DevAddr = new Memory<byte>(devAddr);
+            this.DevAddrPayload = new Memory<byte>(devAddr);
             var dlSettings = new byte[1];
             Array.Copy(inputMessage, 11, dlSettings, 0, 1);
             this.DlSettings = new Memory<byte>(dlSettings);
@@ -212,7 +215,7 @@ namespace LoRaTools.LoRaMessage
                 }
                 else
                 {
-                    Logger.Log(ConversionHelper.ByteArrayToString(this.DevAddr.Span.ToArray()), $"{((LoRaMessageType)this.Mhdr.Span[0]).ToString()} {jsonMsg}", LogLevel.Debug);
+                    Logger.Log(ConversionHelper.ByteArrayToString(this.DevAddr.ToArray()), $"{((LoRaMessageType)this.Mhdr.Span[0]).ToString()} {jsonMsg}", LogLevel.Debug);
                 }
             }
 

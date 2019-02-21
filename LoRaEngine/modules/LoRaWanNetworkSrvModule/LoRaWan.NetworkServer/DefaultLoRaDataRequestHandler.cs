@@ -480,19 +480,10 @@ namespace LoRaWan.NetworkServer
                 fctrl |= (int)FctrlEnum.FpendingOrClassB;
             }
 
-            // if (macbytes != null && linkCheckCmdResponse != null)
-            //     macbytes = macbytes.Concat(linkCheckCmdResponse).ToArray();
-            var srcDevAddr = upstreamPayload.DevAddr.Span;
-            var reversedDevAddr = new byte[srcDevAddr.Length];
-            for (int i = reversedDevAddr.Length - 1; i >= 0; --i)
-            {
-                reversedDevAddr[i] = srcDevAddr[srcDevAddr.Length - (1 + i)];
-            }
-
             var msgType = requiresDeviceAcknowlegement ? LoRaMessageType.ConfirmedDataDown : LoRaMessageType.UnconfirmedDataDown;
             var ackLoRaMessage = new LoRaPayloadData(
                 msgType,
-                reversedDevAddr,
+                upstreamPayload.DevAddrPayload.Span.ToArray(),
                 new byte[] { fctrl },
                 BitConverter.GetBytes(fcntDown),
                 macCommands,

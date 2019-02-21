@@ -191,7 +191,7 @@ namespace LoRaWanTest
             LoRaPayloadData loRaPayloadUplinkObj = (LoRaPayloadData)loRaPayload;
             Assert.True(loRaPayloadUplinkObj.Fcnt.Span.SequenceEqual(new byte[2] { 1, 0 }));
 
-            Assert.True(loRaPayloadUplinkObj.DevAddr.Span.SequenceEqual(new byte[4] { 1, 2, 3, 4 }));
+            Assert.True(loRaPayloadUplinkObj.DevAddr.SequenceEqual(new byte[4] { 4, 3, 2, 1 }));
             byte[] loRaPayloadUplinkNwkKey = new byte[16] { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 };
 
             Assert.True(loRaPayloadUplinkObj.CheckMic(ConversionHelper.ByteArrayToString(loRaPayloadUplinkNwkKey)));
@@ -501,7 +501,7 @@ namespace LoRaWanTest
 
             Assert.True(loRaPayloadUplinkObj.Fcnt.Span.SequenceEqual(new byte[2] { 1, 0 }));
 
-            Assert.True(loRaPayloadUplinkObj.DevAddr.Span.SequenceEqual(new byte[4] { 1, 2, 3, 4 }));
+            Assert.True(loRaPayloadUplinkObj.DevAddr.SequenceEqual(new byte[4] { 4, 3, 2, 1 }));
             byte[] loRaPayloadUplinkNwkKey = new byte[16] { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 };
 
             Assert.True(loRaPayloadUplinkObj.CheckMic(ConversionHelper.ByteArrayToString(loRaPayloadUplinkNwkKey)));
