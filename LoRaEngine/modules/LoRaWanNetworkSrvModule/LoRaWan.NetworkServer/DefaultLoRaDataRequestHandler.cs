@@ -468,7 +468,8 @@ namespace LoRaWan.NetworkServer
                 frmPayload = cloudToDeviceMessage?.GetBytes();
 
                 Logger.Log(loRaDevice.DevEUI, $"C2D message: {(frmPayload?.Length == 0 ? "empty" : Encoding.UTF8.GetString(frmPayload))}, id: {cloudToDeviceMessage.MessageId ?? "undefined"}, fport: {fport ?? 0}, confirmed: {requiresDeviceAcknowlegement}, macCommand: {(macCommands.Count > 0 ? true : false)}", LogLevel.Information);
-                // cut to the max payload of lora for any EU datarate
+
+                // cut to the max payload of lora for any EU datarate // ToDo: AB#644
                 if (frmPayload.Length > 51)
                     Array.Resize(ref frmPayload, 51);
 
