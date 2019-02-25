@@ -8,9 +8,11 @@ namespace LoraKeysManagerFacade.Test
 
     public class FCntCacheCheckTest : FunctionTestBase
     {
+        private readonly FCntCacheCheck fcntCheck;
+
         public FCntCacheCheckTest()
         {
-            LoRaDeviceCache.EnsureCacheStore(new LoRaInMemoryDeviceStore());
+            this.fcntCheck = new FCntCacheCheck(new LoRaInMemoryDeviceStore());
         }
 
         [Fact]
@@ -19,7 +21,7 @@ namespace LoraKeysManagerFacade.Test
             var deviceEUI = NewUniqueEUI64();
             var gatewayId = NewUniqueEUI64();
 
-            var next = FCntCacheCheck.GetNextFCntDown(deviceEUI, gatewayId, 1, 1, string.Empty);
+            var next = this.fcntCheck.GetNextFCntDown(deviceEUI, gatewayId, 1, 1);
             Assert.Equal(2, next);
         }
 
@@ -29,10 +31,10 @@ namespace LoraKeysManagerFacade.Test
             var deviceEUI = NewUniqueEUI64();
             var gatewayId = NewUniqueEUI64();
 
-            var next = FCntCacheCheck.GetNextFCntDown(deviceEUI, gatewayId, 1, 1, string.Empty);
+            var next = this.fcntCheck.GetNextFCntDown(deviceEUI, gatewayId, 1, 1);
             Assert.Equal(2, next);
 
-            next = FCntCacheCheck.GetNextFCntDown(deviceEUI, gatewayId, 2, 1, string.Empty);
+            next = this.fcntCheck.GetNextFCntDown(deviceEUI, gatewayId, 2, 1);
             Assert.Equal(3, next);
         }
 
@@ -42,10 +44,10 @@ namespace LoraKeysManagerFacade.Test
             var deviceEUI = NewUniqueEUI64();
             var gatewayId = NewUniqueEUI64();
 
-            var next = FCntCacheCheck.GetNextFCntDown(deviceEUI, gatewayId, 1, 1, string.Empty);
+            var next = this.fcntCheck.GetNextFCntDown(deviceEUI, gatewayId, 1, 1);
             Assert.Equal(2, next);
 
-            next = FCntCacheCheck.GetNextFCntDown(deviceEUI, gatewayId, 3, 10, string.Empty);
+            next = this.fcntCheck.GetNextFCntDown(deviceEUI, gatewayId, 3, 10);
             Assert.Equal(11, next);
         }
 
@@ -55,10 +57,10 @@ namespace LoraKeysManagerFacade.Test
             var deviceEUI = NewUniqueEUI64();
             var gatewayId = NewUniqueEUI64();
 
-            var next = FCntCacheCheck.GetNextFCntDown(deviceEUI, gatewayId, 1, 1, string.Empty);
+            var next = this.fcntCheck.GetNextFCntDown(deviceEUI, gatewayId, 1, 1);
             Assert.Equal(2, next);
 
-            next = FCntCacheCheck.GetNextFCntDown(deviceEUI, gatewayId, 1, 1, string.Empty);
+            next = this.fcntCheck.GetNextFCntDown(deviceEUI, gatewayId, 1, 1);
             Assert.Equal(3, next);
         }
     }
